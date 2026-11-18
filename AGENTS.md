@@ -44,6 +44,7 @@ Integration agents may edit both applications only to resolve API mismatches or 
 8. Keep changes small and commit on the assigned branch.
 9. Do not add dependencies without explaining why.
 10. Never weaken, skip, or delete tests to make checks pass.
+11. Use integer IDs consistently across database primary keys, foriegn keys and API resource identifiers. Do not introduce UUIDs without project-owner approval.
 
 Branch prefixes:
 - `feat/backend-*`

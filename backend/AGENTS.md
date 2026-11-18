@@ -35,7 +35,7 @@ Create missing directories only when needed. Do not reorganize existing code wit
 ## Database
 
 - Use SQLAlchemy and Alembic, not Prisma.
-- Use UUIDs internally where appropriate.
+- Use ineger IDs consistently for database primary keys, foreign keys, and API resource identifiers . Do not introduce UUIDs unless the project owner explicitly approves a change.
 - Generate customer codes, job IDs where applicable, and receipt numbers server-side.
 - Create one new Alembic migration for each schema change.
 - Never edit an existing migration that may have been applied.
