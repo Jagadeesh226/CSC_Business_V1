@@ -65,28 +65,38 @@ def create_job(db: Session, data: JobCreate, created_by: int | None = None) -> J
     if not service.is_active:
         raise BusinessRuleError("Service is inactive and cannot be used for new jobs.")
 
-    try:
-        year = repo.current_year(db, BUSINESS_TIMEZONE)
-        value = repo.next_sequence_value(db, JOB_NUMBER_SEQUENCE, year)
-        job = repo.add_job(
-            db,
-            Job(
-                job_number=format_job_number(year, value),
-                customer_id=data.customer_id,
-                service_id=data.service_id,
-                title=data.title,
-                description=data.description,
-                due_date=data.due_date,
-                status=JobStatus.PENDING.value,
-                created_by=created_by,
-            ),
-        )
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ConflictError("The job could not be created. Please retry.") from None
+    # The second attempt runs only after a collision: if a job number exists
+    # that the counter did not issue (imported or manually fixed data), the
+    # counter is advanced past the highest existing number and allocation is
+    # retried once. Without this, the rollback would also undo the increment
+    # and every retry would collide with the same number.
+    for attempt in range(2):
+        try:
+            year = repo.current_year(db, BUSINESS_TIMEZONE)
+            if attempt:
+                repo.sync_sequence_to_existing_job_numbers(
+                    db, JOB_NUMBER_SEQUENCE, year, f"{JOB_NUMBER_PREFIX}-{year}-"
+                )
+            value = repo.next_sequence_value(db, JOB_NUMBER_SEQUENCE, year)
+            job = repo.add_job(
+                db,
+                Job(
+                    job_number=format_job_number(year, value),
+                    customer_id=data.customer_id,
+                    service_id=data.service_id,
+                    title=data.title,
+                    description=data.description,
+                    due_date=data.due_date,
+                    status=JobStatus.PENDING.value,
+                    created_by=created_by,
+                ),
+            )
+            db.commit()
+            return get_job(db, job.id)
+        except IntegrityError:
+            db.rollback()
 
-    return get_job(db, job.id)
+    raise ConflictError("The job could not be created. Please retry.")
 
 
 def list_jobs(

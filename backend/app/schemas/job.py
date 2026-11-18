@@ -10,6 +10,14 @@ JobTitle = Annotated[
 ]
 
 
+# Integer IDs map to PostgreSQL int4 columns; larger values would fail in SQL.
+MAX_DB_INT = 2**31 - 1
+ResourceId = Annotated[int, Field(gt=0, le=MAX_DB_INT)]
+
+# Upper bound on free-text description, to keep rows and list pages bounded.
+JobDescription = Annotated[str, StringConstraints(max_length=5000)]
+
+
 class JobStatus(StrEnum):
     """Job statuses approved in docs/contracts/decisions.md section 7."""
 
@@ -25,10 +33,10 @@ class JobCreate(BaseModel):
     # Unknown fields (job_number, status, created_by, ...) are rejected with 422.
     model_config = ConfigDict(extra="forbid")
 
-    customer_id: int = Field(gt=0)
-    service_id: int = Field(gt=0)
+    customer_id: ResourceId
+    service_id: ResourceId
     title: JobTitle
-    description: str | None = None
+    description: JobDescription | None = None
     due_date: date | None = None
 
 
@@ -38,7 +46,7 @@ class JobUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: JobTitle | None = None
-    description: str | None = None
+    description: JobDescription | None = None
     due_date: date | None = None
 
     @model_validator(mode="after")

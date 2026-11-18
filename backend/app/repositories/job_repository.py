@@ -1,6 +1,16 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import ColumnElement, Row, func, or_, select
+from sqlalchemy import (
+    BigInteger,
+    ColumnElement,
+    DateTime,
+    Row,
+    cast,
+    func,
+    literal,
+    or_,
+    select,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -21,10 +31,41 @@ def get_job(db: Session, job_id: int) -> Job | None:
     return db.get(Job, job_id)
 
 
-def current_year(db: Session, timezone: str) -> int:
-    """Calendar year from the database clock in the given time zone."""
-    return int(
-        db.scalar(select(func.extract("year", func.timezone(timezone, func.now()))))
+def current_year(db: Session, timezone: str, at: datetime | None = None) -> int:
+    """Calendar year in the given time zone, from the database clock by default.
+
+    ``at`` overrides the clock (used by tests for year-boundary checks).
+    """
+    moment = func.now() if at is None else literal(at, DateTime(timezone=True))
+    return int(db.scalar(select(func.extract("year", func.timezone(timezone, moment)))))
+
+
+def sync_sequence_to_existing_job_numbers(
+    db: Session, name: str, year: int, prefix: str
+) -> None:
+    """Advance a counter past the highest existing job number with ``prefix``.
+
+    Recovers from job numbers the counter did not issue. Never lowers it.
+    """
+    suffix = func.substring(Job.job_number, len(prefix) + 1)
+    highest = db.scalar(
+        select(func.max(cast(suffix, BigInteger))).where(
+            Job.job_number.startswith(prefix, autoescape=True),
+            suffix.regexp_match("^[0-9]+$"),
+        )
+    )
+    if not highest:
+        return
+    stmt = insert(SequenceCounter).values(name=name, year=year, last_value=highest)
+    db.execute(
+        stmt.on_conflict_do_update(
+            index_elements=[SequenceCounter.name, SequenceCounter.year],
+            set_={
+                "last_value": func.greatest(
+                    SequenceCounter.last_value, stmt.excluded.last_value
+                )
+            },
+        )
     )
 
 

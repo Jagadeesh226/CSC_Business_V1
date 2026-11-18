@@ -408,3 +408,43 @@ def test_update_rejects_protected_fields(client, job, field, value):
 
     assert response.status_code == 422
     assert client.get(f"/api/v1/jobs/{job['id']}").json() == job
+
+
+# ---------- bounds (review finding M2 / L1) ----------
+
+TOO_BIG = 2**31
+
+
+@pytest.mark.parametrize(
+    "method, url",
+    [("get", f"/api/v1/jobs/{TOO_BIG}"), ("patch", f"/api/v1/jobs/{TOO_BIG}")],
+)
+def test_out_of_range_job_id_is_422(client, method, url):
+    kwargs = {"json": {"title": "X"}} if method == "patch" else {}
+    assert getattr(client, method)(url, **kwargs).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"customer_id": TOO_BIG},
+        {"service_id": TOO_BIG},
+        {"page": 10**17, "page_size": 100},
+    ],
+)
+def test_out_of_range_list_params_are_422(client, params):
+    assert client.get("/api/v1/jobs", params=params).status_code == 422
+
+
+@pytest.mark.parametrize("field", ["customer_id", "service_id"])
+def test_create_out_of_range_ids_are_422(client, customer, service, field):
+    assert create(client, customer, service, **{field: TOO_BIG}).status_code == 422
+
+
+def test_description_length_limit(client, customer, service, job):
+    assert create(client, customer, service, description="x" * 5000).status_code == 201
+    assert create(client, customer, service, description="x" * 5001).status_code == 422
+    response = client.patch(
+        f"/api/v1/jobs/{job['id']}", json={"description": "x" * 5001}
+    )
+    assert response.status_code == 422

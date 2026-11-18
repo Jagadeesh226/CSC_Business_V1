@@ -34,6 +34,20 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("name", "year"),
     )
+    # Seed job-number counters from any existing CSC-YYYY-NNNNNN numbers so the
+    # first allocation in each year continues after them instead of colliding.
+    op.execute(
+        """
+        INSERT INTO sequence_counters (name, year, last_value)
+        SELECT 'job_number',
+               CAST(substring(job_number FROM 5 FOR 4) AS integer),
+               MAX(CAST(substring(job_number FROM 10) AS bigint))
+        FROM jobs
+        WHERE job_number ~ '^CSC-[0-9]{4}-[0-9]+$'
+        GROUP BY 2
+        HAVING MAX(CAST(substring(job_number FROM 10) AS bigint)) > 0
+        """
+    )
 
 
 def downgrade() -> None:
