@@ -12,7 +12,11 @@ need real commits (concurrency) clean up with TRUNCATE on the test database.
 """
 
 import os
-from collections.abc import Iterator
+
+# Test clients talk plain HTTP, so auth cookies must not be Secure-only.
+os.environ["COOKIE_SECURE"] = "false"
+
+from collections.abc import Callable, Iterator
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,9 +27,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, make_url
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.db.session import get_db
 from app.main import app
-from app.models import Customer, Service, ServiceCategory
+from app.models import Customer, Service, ServiceCategory, User
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -85,14 +90,85 @@ def db_session(test_engine: Engine) -> Iterator[Session]:
         connection.close()
 
 
+TEST_PASSWORD = "correct-horse-battery"
+# Hashed once: Argon2 is deliberately slow.
+_TEST_PASSWORD_HASH = hash_password(TEST_PASSWORD)
+
+
 @pytest.fixture
-def client(db_session: Session) -> Iterator[TestClient]:
+def make_user(db_session: Session) -> Callable[..., User]:
+    counter = iter(range(1, 10_000))
+
+    def _make(
+        role: str = "employee",
+        *,
+        name: str | None = None,
+        email: str | None = None,
+        is_active: bool = True,
+        must_change_password: bool = False,
+    ) -> User:
+        n = next(counter)
+        user = User(
+            name=name or f"Test {role.title()} {n}",
+            email=email or f"{role}{n}@example.com",
+            password_hash=_TEST_PASSWORD_HASH,
+            role=role,
+            is_active=is_active,
+            must_change_password=must_change_password,
+        )
+        db_session.add(user)
+        db_session.flush()
+        return user
+
+    return _make
+
+
+@pytest.fixture
+def make_client(db_session: Session) -> Iterator[Callable[..., TestClient]]:
+    """TestClient factory; pass a user to get a signed-in client with CSRF set."""
     app.dependency_overrides[get_db] = lambda: db_session
+
+    def _make(user: User | None = None, password: str = TEST_PASSWORD) -> TestClient:
+        test_client = TestClient(app)
+        if user is not None:
+            response = test_client.post(
+                "/api/v1/auth/login",
+                json={"email": user.email, "password": password},
+            )
+            assert response.status_code == 200, response.text
+            test_client.headers["X-CSRF-Token"] = response.json()["csrf_token"]
+        return test_client
+
     try:
-        with TestClient(app) as test_client:
-            yield test_client
+        yield _make
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def admin_user(make_user) -> User:
+    return make_user("admin", name="Admin Test")
+
+
+@pytest.fixture
+def employee_user(make_user) -> User:
+    return make_user("employee", name="Employee Test")
+
+
+@pytest.fixture
+def client(make_client, admin_user) -> TestClient:
+    """Signed-in admin client (full access)."""
+    return make_client(admin_user)
+
+
+@pytest.fixture
+def employee_client(make_client, employee_user) -> TestClient:
+    return make_client(employee_user)
+
+
+@pytest.fixture
+def anon_client(make_client) -> TestClient:
+    return make_client()
 
 
 @pytest.fixture

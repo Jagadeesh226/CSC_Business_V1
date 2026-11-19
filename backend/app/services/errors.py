@@ -18,3 +18,11 @@ class BusinessRuleError(ServiceError):
 
 class ConflictError(ServiceError):
     status_code = 409
+
+
+class AuthenticationError(ServiceError):
+    status_code = 401
+
+
+class PermissionDeniedError(ServiceError):
+    status_code = 403
