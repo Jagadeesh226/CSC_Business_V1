@@ -43,10 +43,11 @@
 
 ## 4. User Roles
 
-The initial roles are:
-- Admin
-- Employee
-- Read-only / Auditor
+The roles are:
+- Admin (stored as `admin`)
+- Employee (stored as `employee`)
+
+The Read-only / Auditor role was removed on 2026-11-19. Existing `staff` users migrate to `employee`.
 
 Permissions are defined in `permissions.md`.
 
@@ -70,6 +71,7 @@ Permissions are defined in `permissions.md`.
 - Job assignments use a many-to-many relationship.
 - Assignment and removal actions are audited.
 - Job status changes are recorded in status history.
+- Until job assignment exists, employees can view all jobs and create jobs, and only admins can edit jobs. After job assignment, employees are limited to their assigned jobs.
 
 Initial job statuses:
 - `pending`
@@ -78,6 +80,18 @@ Initial job statuses:
 - `submitted`
 - `completed`
 - `cancelled`
+
+Allowed status changes:
+- `pending` → `in_progress`
+- `in_progress` → `waiting_for_documents` or `submitted`
+- `waiting_for_documents` → `in_progress`
+- `submitted` → `completed`
+- Cancelling is a separate admin-only action that needs a reason. It is allowed from any status except `completed` and `cancelled`.
+- `completed` and `cancelled` are final. Jobs in these statuses cannot be reopened.
+
+Job fees:
+- Employees can add fees only until the job has at least one payment with status `received`.
+- Only admins can edit or delete fees.
 
 ## 8. Document Management
 
@@ -153,6 +167,8 @@ Initial task types:
 - Sensitive fields must be masked or excluded where appropriate.
 
 ## 14. Audit Logging
+
+Audit entries reference the affected record by its integer ID (`audit_logs.entity_id`).
 
 Important actions must be recorded, including:
 - Authentication events.

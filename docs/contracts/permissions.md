@@ -6,7 +6,6 @@
 |---|---|
 | Admin | Full administrative control over users, services, customers, jobs, documents and reports. |
 | Employee | Performs assigned operational work, manages permitted customer records and processes documents. |
-| Read-only / Auditor | Views authorized records and reports without modifying business data. |
 
 ## 2. Permission Matrix
 
@@ -17,43 +16,48 @@ Legend:
 - **No** — No access.
 - **Restricted** — Subject to additional authorization and auditing.
 
-| Feature | Admin | Employee | Read-only / Auditor |
-|---|---|---|---|
-| View dashboard | Full | Full | Read |
-| View customers | Full | Full | Read |
-| Create customers | Full | Full | No |
-| Update customers | Full | Full | No |
-| Delete customers | Restricted | No | No |
-| View services | Full | Read | Read |
-| Create services | Full | No | No |
-| Update services | Full | No | No |
-| Deactivate services | Full | No | No |
-| View jobs | Full | Assigned + permitted records | Read |
-| Create jobs | Full | Full | No |
-| Update jobs | Full | Assigned | No |
-| Assign employees | Full | No | No |
-| Change job status | Full | Assigned | No |
-| View job history | Full | Assigned | Read |
-| Upload documents | Full | Assigned + permitted customer workflows | No |
-| View documents | Full | Authorized records | Read |
-| Download documents | Full | Authorized records | Read |
-| Archive documents | Full | Restricted | No |
-| Manage OCR results | Full | View processing results | Read |
-| View vehicles | Full | Authorized records | Read |
-| Create vehicles | Full | Full | No |
-| Update vehicles | Full | Permitted fields | No |
-| Trigger vehicle lookup | Full | Authorized operational workflow | No |
-| View vehicle expiry | Full | Authorized records | Read |
-| Create reminders | Full | Full | No |
-| Complete reminders | Full | Assigned / authorized reminders | No |
-| View reminders | Full | Authorized records | Read |
-| Generate Excel exports | Full | Restricted to permitted datasets | Read-only reports |
-| Manage users | Full | No | No |
-| Create employee accounts | Full | No | No |
-| Deactivate users | Full | No | No |
-| Initiate password resets | Full | No | No |
-| View audit logs | Full | No | Restricted read |
-| Modify audit logs | No | No | No |
+The Read-only / Auditor role was removed by owner decision on 2026-11-19. The only roles are `admin` and `employee`.
+
+| Feature | Admin | Employee |
+|---|---|---|
+| View dashboard | Full | Full |
+| View customers | Full | Full |
+| Create customers | Full | Full |
+| Update customers | Full | Full |
+| Delete customers | Restricted | No |
+| View services | Full | Read |
+| Create services | Full | No |
+| Update services | Full | No |
+| Deactivate services | Full | No |
+| View jobs | Full | Assigned + permitted records |
+| Create jobs | Full | Full |
+| Update jobs | Full | Assigned |
+| Assign employees | Full | No |
+| Change job status | Full | Assigned |
+| Cancel jobs | Full | No |
+| Add job fees | Full | Until a payment is received |
+| Edit or delete job fees | Full | No |
+| View job history | Full | Assigned |
+| Upload documents | Full | Assigned + permitted customer workflows |
+| View documents | Full | Authorized records |
+| Download documents | Full | Authorized records |
+| Archive documents | Full | Restricted |
+| Manage OCR results | Full | View processing results |
+| View vehicles | Full | Authorized records |
+| Create vehicles | Full | Full |
+| Update vehicles | Full | Permitted fields |
+| Trigger vehicle lookup | Full | Authorized operational workflow |
+| View vehicle expiry | Full | Authorized records |
+| Create reminders | Full | Full |
+| Complete reminders | Full | Assigned / authorized reminders |
+| View reminders | Full | Authorized records |
+| Generate Excel exports | Full | Restricted to permitted datasets |
+| Manage users | Full | No |
+| Create employee accounts | Full | No |
+| Deactivate users | Full | No |
+| Initiate password resets | Full | No |
+| View audit logs | Full | No |
+| Modify audit logs | No | No |
 
 ## 3. Important Authorization Rules
 
@@ -68,11 +72,6 @@ Legend:
 - Employees can update the status of jobs assigned to them.
 - Employees cannot manage users or change role permissions.
 - Employee access to personal and vehicle information must be limited to operational requirements.
-
-### Read-only / Auditor
-- Cannot create, update, delete, upload or modify business records.
-- Can only view records permitted by their access scope.
-- Audit-log access is read-only.
 
 ## 4. Sensitive Data Protection
 
