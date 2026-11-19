@@ -16,6 +16,7 @@ from app.schemas.job import (
     JobUpdate,
     ServiceRef,
 )
+from app.services import audit_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 
 JOB_NUMBER_SEQUENCE = "job_number"
@@ -54,8 +55,8 @@ def get_job(db: Session, job_id: int) -> JobRead:
 def create_job(db: Session, data: JobCreate, created_by: int | None = None) -> JobRead:
     """Create a job with a server-generated number and status ``pending``.
 
-    ``created_by`` must come from the authenticated user, never the request
-    body. Authentication is not implemented yet, so routes pass ``None``.
+    ``created_by`` is the authenticated user's id, never taken from the
+    request body.
     """
     if repo.get_customer(db, data.customer_id) is None:
         raise NotFoundError("Customer not found.")
@@ -90,6 +91,14 @@ def create_job(db: Session, data: JobCreate, created_by: int | None = None) -> J
                     status=JobStatus.PENDING.value,
                     created_by=created_by,
                 ),
+            )
+            audit_service.record(
+                db,
+                action="job_created",
+                entity_type="job",
+                entity_id=job.id,
+                user_id=created_by,
+                details={"job_number": job.job_number},
             )
             db.commit()
             return get_job(db, job.id)
@@ -130,13 +139,29 @@ def list_jobs(
     )
 
 
-def update_job(db: Session, job_id: int, data: JobUpdate) -> JobRead:
+def update_job(
+    db: Session, job_id: int, data: JobUpdate, actor_id: int | None = None
+) -> JobRead:
     job = repo.get_job(db, job_id)
     if job is None:
         raise NotFoundError("Job not found.")
 
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changed = {
+        field: value
+        for field, value in data.model_dump(exclude_unset=True).items()
+        if getattr(job, field) != value
+    }
+    for field, value in changed.items():
         setattr(job, field, value)
+    if changed:
+        audit_service.record(
+            db,
+            action="job_updated",
+            entity_type="job",
+            entity_id=job.id,
+            user_id=actor_id,
+            details={"fields": sorted(changed)},
+        )
     db.commit()
 
     return get_job(db, job_id)

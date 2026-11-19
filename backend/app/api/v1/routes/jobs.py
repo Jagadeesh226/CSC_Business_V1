@@ -1,10 +1,9 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Path, Query, status
 
-from app.db.session import get_db
+from app.core.dependencies import AUTH_RESPONSES, AdminUser, CurrentUser, DbSession
 from app.schemas.error import ErrorResponse
 from app.schemas.job import (
     MAX_DB_INT,
@@ -16,14 +15,10 @@ from app.schemas.job import (
 )
 from app.services import job_service
 
-# AUTH INTEGRATION POINT: authentication is not implemented yet. When it is,
-# add the authenticated-user dependency and per-role permission checks here
-# (see docs/contracts/permissions.md) and pass the user id to create_job as
-# created_by. Until then these routes are unauthenticated and must not be
-# exposed outside local development.
-router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-DbSession = Annotated[Session, Depends(get_db)]
+# Access (owner decision, until job assignment exists): admins and employees
+# can view and create jobs; only admins can edit them. Once assignments land,
+# employees are limited to their assigned jobs.
+router = APIRouter(prefix="/jobs", tags=["jobs"], responses=AUTH_RESPONSES)
 
 JobId = Annotated[int, Path(gt=0, le=MAX_DB_INT)]
 # Keeps OFFSET within PostgreSQL bigint range.
@@ -58,12 +53,13 @@ CREATE_422 = {
         422: CREATE_422,
     },
 )
-def create_job(payload: JobCreate, db: DbSession) -> JobRead:
-    return job_service.create_job(db, payload, created_by=None)
+def create_job(payload: JobCreate, user: CurrentUser, db: DbSession) -> JobRead:
+    return job_service.create_job(db, payload, created_by=user.id)
 
 
 @router.get("", response_model=JobListResponse)
 def list_jobs(
+    user: CurrentUser,
     db: DbSession,
     page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -89,10 +85,12 @@ def list_jobs(
 
 
 @router.get("/{job_id}", response_model=JobRead, responses=NOT_FOUND)
-def get_job(job_id: JobId, db: DbSession) -> JobRead:
+def get_job(job_id: JobId, user: CurrentUser, db: DbSession) -> JobRead:
     return job_service.get_job(db, job_id)
 
 
 @router.patch("/{job_id}", response_model=JobRead, responses=NOT_FOUND)
-def update_job(job_id: JobId, payload: JobUpdate, db: DbSession) -> JobRead:
-    return job_service.update_job(db, job_id, payload)
+def update_job(
+    job_id: JobId, payload: JobUpdate, admin: AdminUser, db: DbSession
+) -> JobRead:
+    return job_service.update_job(db, job_id, payload, actor_id=admin.id)
