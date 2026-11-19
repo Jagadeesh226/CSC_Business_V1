@@ -40,6 +40,25 @@ jobs:
   backend:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: csc_test
+          POSTGRES_PASSWORD: csc_test_only
+          POSTGRES_DB: csc_crm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U csc_test -d csc_crm_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Disposable CI-only database; these are not real credentials.
+      TEST_DATABASE_URL: postgresql+psycopg://csc_test:csc_test_only@localhost:5432/csc_crm_test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +76,10 @@ jobs:
       - name: Lint backend
         working-directory: backend
         run: uv run ruff check app tests
+
+      - name: Check backend formatting
+        working-directory: backend
+        run: uv run ruff format --check app tests
 
       - name: Test backend
         working-directory: backend
