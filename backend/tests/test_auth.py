@@ -262,3 +262,38 @@ def test_audit_details_are_json(employee_client, db_session):
     for details in db_session.scalars(select(AuditLog.details)).all():
         if details:
             json.loads(details)
+
+
+# ---------- review fixes ----------
+
+
+def test_wrong_current_password_is_audited(employee_client, employee_user, db_session):
+    employee_client.post(
+        CHANGE,
+        json={"current_password": "a-wrong-guess", "new_password": "a-brand-new-pass"},
+    )
+    assert "password_change_failed" in audit_actions(db_session, employee_user.id)
+
+
+def test_login_revokes_browsers_previous_session(
+    make_client, employee_user, admin_user
+):
+    browser = make_client(employee_user)
+    old_token = browser.cookies.get("csc_session")
+
+    # Someone else signs in on the same browser (shared counter PC).
+    response = browser.post(
+        LOGIN, json={"email": admin_user.email, "password": TEST_PASSWORD}
+    )
+    assert response.status_code == 200
+
+    replay = make_client()
+    replay.cookies.set("csc_session", old_token)
+    assert replay.get(ME).status_code == 401
+
+
+def test_cookies_are_secure_by_default(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.delenv("COOKIE_SECURE", raising=False)
+    assert Settings().cookie_secure is True

@@ -134,6 +134,7 @@ def update_user(db: Session, actor: User, user_id: int, data: UserUpdate) -> Use
                 _ensure_not_last_admin(db, user)
 
     changed = {k: v for k, v in changes.items() if getattr(user, k) != v}
+    previous = {k: getattr(user, k) for k in changed}
     try:
         for field, value in changed.items():
             setattr(user, field, value)
@@ -144,13 +145,28 @@ def update_user(db: Session, actor: User, user_id: int, data: UserUpdate) -> Use
                 entity_type="user",
                 entity_id=user.id,
                 user_id=actor.id,
-                details={"fields": sorted(changed)},
+                details=_change_details(user, changed, previous),
             )
         db.commit()
     except IntegrityError:
         db.rollback()
         raise ConflictError(EMAIL_TAKEN) from None
     return UserRead.model_validate(user)
+
+
+# Fields whose old and new values are recorded in the audit log: role changes
+# (promotion/demotion) and email (the login identifier).
+_AUDITED_VALUES = ("role", "email")
+
+
+def _change_details(
+    user: User, changed: dict[str, object], previous: dict[str, object]
+) -> dict[str, object]:
+    details: dict[str, object] = {"fields": sorted(changed)}
+    for field in _AUDITED_VALUES:
+        if field in changed:
+            details[field] = {"old": previous[field], "new": getattr(user, field)}
+    return details
 
 
 def deactivate_user(db: Session, actor: User, user_id: int) -> UserRead:

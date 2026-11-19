@@ -102,3 +102,11 @@ def revoke_sessions(
     if except_session_id is not None:
         stmt = stmt.where(UserSession.id != except_session_id)
     db.execute(stmt.values(revoked_at=now))
+
+
+def revoke_session_by_token_hash(db: Session, token_hash: str, now: datetime) -> None:
+    db.execute(
+        update(UserSession)
+        .where(UserSession.token_hash == token_hash, UserSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )

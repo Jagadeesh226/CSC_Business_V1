@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
 
-from app.api.deps import AUTH_RESPONSES, AdminUser, CurrentUser, DbSession
+from app.core.dependencies import AUTH_RESPONSES, AdminUser, CurrentUser, DbSession
 from app.schemas.error import ErrorResponse
 from app.schemas.job import (
     MAX_DB_INT,

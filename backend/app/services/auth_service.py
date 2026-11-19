@@ -42,7 +42,14 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def login(db: Session, email: str, password: str) -> LoginResult:
+def login(
+    db: Session, email: str, password: str, previous_token: str | None = None
+) -> LoginResult:
+    """Sign in. Any session the browser already had is revoked first, so
+    signing in again (e.g. another person on a shared PC) never leaves the
+    earlier session usable."""
+    if previous_token:
+        repo.revoke_session_by_token_hash(db, hash_token(previous_token), _now())
     user = repo.get_user_by_email(db, email)
     # Always verify a hash so timing does not reveal whether the email exists.
     valid = verify_password(user.password_hash if user else None, password)
@@ -117,6 +124,16 @@ def change_password(
 ) -> User:
     user = ctx.user
     if not verify_password(user.password_hash, current_password):
+        # Committed before raising so repeated guessing from a stolen or
+        # unattended session leaves a trace.
+        audit_service.record(
+            db,
+            action="password_change_failed",
+            entity_type="user",
+            entity_id=user.id,
+            user_id=user.id,
+        )
+        db.commit()
         raise BusinessRuleError("Current password is incorrect.")
     if current_password == new_password:
         raise BusinessRuleError("New password must be different.")

@@ -5,6 +5,8 @@
 - roles limited to 'admin' and 'employee'; existing 'staff' users become
   'employee' (owner decision). Any other existing role makes the upgrade fail
   on the check constraint, so it is never silently changed.
+- emails normalised to trimmed lower case, with a unique index on
+  lower(email). Fails if two existing emails differ only by case.
 - audit_logs.entity_id: VARCHAR -> INTEGER (integer IDs everywhere). Fails if
   an existing value is not an integer, rather than discarding it.
 
@@ -69,6 +71,11 @@ def upgrade() -> None:
         "ck_users_role", "users", "role IN ('admin', 'employee')"
     )
 
+    op.execute("UPDATE users SET email = lower(trim(email))")
+    op.create_index(
+        "uq_users_email_lower", "users", [sa.text("lower(email)")], unique=True
+    )
+
     op.alter_column(
         "audit_logs",
         "entity_id",
@@ -89,6 +96,7 @@ def downgrade() -> None:
         existing_nullable=True,
         postgresql_using="entity_id::text",
     )
+    op.drop_index("uq_users_email_lower", table_name="users")
     op.drop_constraint("ck_users_role", "users", type_="check")
     # Lossy by design: the original schema only knew the 'staff' default.
     op.execute("UPDATE users SET role = 'staff' WHERE role = 'employee'")

@@ -1,7 +1,10 @@
+import json
+
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from app.models import AuditLog
+from app.models import AuditLog, User
 from app.schemas.user import UserUpdate
 from app.services import user_service
 from app.services.errors import BusinessRuleError
@@ -286,3 +289,48 @@ def test_cli_rejects_mismatched_passwords(monkeypatch, capsys):
 
     assert code == 1
     assert "do not match" in capsys.readouterr().err
+
+
+# ---------- review fixes ----------
+
+
+def test_role_and_email_changes_record_old_and_new(client, employee_user, db_session):
+    old_email = employee_user.email
+    client.patch(
+        f"{USERS}/{employee_user.id}",
+        json={"role": "admin", "email": "promoted@example.com"},
+    )
+
+    details = json.loads(last_audit(db_session, "user_updated").details)
+    assert details["role"] == {"old": "employee", "new": "admin"}
+    assert details["email"] == {"old": old_email, "new": "promoted@example.com"}
+
+
+def test_admin_who_must_change_password_cannot_manage_users(make_client, make_user):
+    admin = make_client(make_user("admin", must_change_password=True))
+    response = admin.get(USERS)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "You must change your password first."}
+
+
+def test_emails_unique_case_insensitively_in_database(db_session, employee_user):
+    db_session.add(
+        User(
+            name="Dup",
+            email=employee_user.email.upper(),
+            password_hash="x",
+            role="employee",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.flush()
+
+
+@pytest.mark.parametrize("email", ["admin@localhost", "not-an-email", ""])
+def test_cli_rejects_invalid_email(monkeypatch, capsys, email):
+    from app import cli
+
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt: "owner-pass-123")
+    code = cli.main(["create-admin", "--name", "Owner", "--email", email])
+    assert code == 1
+    assert "Invalid input" in capsys.readouterr().err

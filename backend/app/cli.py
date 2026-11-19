@@ -11,7 +11,7 @@ import argparse
 import getpass
 import sys
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import EmailStr, TypeAdapter, ValidationError
 
 from app.db.session import SessionLocal, get_engine
 from app.schemas.user import Password, UserName
@@ -22,6 +22,8 @@ from app.services.errors import ServiceError
 def _create_admin(args: argparse.Namespace) -> int:
     try:
         name = TypeAdapter(UserName).validate_python(args.name)
+        # Same email rules as the API, so the admin can actually sign in.
+        email = str(TypeAdapter(EmailStr).validate_python(args.email.strip()))
         password = getpass.getpass("Password (10-128 characters): ")
         if password != getpass.getpass("Repeat password: "):
             print("Passwords do not match.", file=sys.stderr)
@@ -34,7 +36,7 @@ def _create_admin(args: argparse.Namespace) -> int:
     with SessionLocal(bind=get_engine()) as db:
         try:
             user = user_service.create_admin(
-                db, name=name, email=args.email, password=password
+                db, name=name, email=email, password=password
             )
         except ServiceError as exc:
             print(exc.detail, file=sys.stderr)

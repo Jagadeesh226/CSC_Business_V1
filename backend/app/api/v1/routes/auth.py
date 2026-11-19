@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 
-from app.api.deps import AUTH_RESPONSES, Auth, DbSession
 from app.core.config import get_settings
+from app.core.dependencies import AUTH_RESPONSES, Auth, DbSession
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, LoginResponse
 from app.schemas.error import ErrorResponse
 from app.schemas.user import UserRead
@@ -47,8 +47,15 @@ def _clear_auth_cookies(response: Response) -> None:
     response_model=LoginResponse,
     responses={401: {"model": ErrorResponse, "description": "Invalid credentials"}},
 )
-def login(payload: LoginRequest, response: Response, db: DbSession) -> LoginResponse:
-    result = auth_service.login(db, str(payload.email), payload.password)
+def login(
+    payload: LoginRequest, request: Request, response: Response, db: DbSession
+) -> LoginResponse:
+    result = auth_service.login(
+        db,
+        str(payload.email),
+        payload.password,
+        previous_token=request.cookies.get(get_settings().session_cookie_name),
+    )
     _set_auth_cookies(response, result.session_token, result.csrf_token)
     return LoginResponse(
         user=UserRead.model_validate(result.user), csrf_token=result.csrf_token

@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, String, false, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Index,
+    String,
+    false,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -10,6 +19,9 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'employee')", name="ck_users_role"),
+        # Emails are compared case-insensitively at login; this keeps them
+        # unique that way and makes the lookup indexed.
+        Index("uq_users_email_lower", text("lower(email)"), unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
