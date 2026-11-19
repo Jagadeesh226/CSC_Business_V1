@@ -334,3 +334,33 @@ def test_cli_rejects_invalid_email(monkeypatch, capsys, email):
     code = cli.main(["create-admin", "--name", "Owner", "--email", email])
     assert code == 1
     assert "Invalid input" in capsys.readouterr().err
+
+
+def test_cli_create_admin_end_to_end(monkeypatch, capsys, test_engine):
+    """Runs the real command with a committing session (integration finding)."""
+    from sqlalchemy import delete
+
+    from app import cli
+
+    monkeypatch.setattr(cli, "get_engine", lambda: test_engine)
+    monkeypatch.setattr(cli.getpass, "getpass", lambda prompt: "owner-pass-123")
+    try:
+        code = cli.main(
+            ["create-admin", "--name", "Owner", "--email", " CLI.Owner@Example.com "]
+        )
+        assert code == 0, capsys.readouterr().err
+        assert "(cli.owner@example.com)" in capsys.readouterr().out
+
+        # Running it again reports the duplicate cleanly instead of crashing.
+        assert (
+            cli.main(
+                ["create-admin", "--name", "Owner", "--email", "cli.owner@example.com"]
+            )
+            == 1
+        )
+        assert "already exists" in capsys.readouterr().err
+    finally:
+        with test_engine.begin() as conn:
+            ids = select(User.id).where(User.email == "cli.owner@example.com")
+            conn.execute(delete(AuditLog).where(AuditLog.entity_id.in_(ids)))
+            conn.execute(delete(User).where(User.email == "cli.owner@example.com"))

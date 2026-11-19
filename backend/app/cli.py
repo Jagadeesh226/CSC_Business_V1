@@ -38,10 +38,12 @@ def _create_admin(args: argparse.Namespace) -> int:
             user = user_service.create_admin(
                 db, name=name, email=email, password=password
             )
+            # Read while the session is open: commit expires the attributes.
+            user_id, user_email = user.id, user.email
         except ServiceError as exc:
             print(exc.detail, file=sys.stderr)
             return 1
-    print(f"Created admin user id={user.id} ({user.email}).")
+    print(f"Created admin user id={user_id} ({user_email}).")
     return 0
 
 
