@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.models import Job, SequenceCounter
+from app.models import AuditLog, Job, SequenceCounter
 
 JOB_NUMBER_RE = re.compile(r"^CSC-(\d{4})-(\d{6})$")
 
@@ -28,7 +28,7 @@ def create(client, customer, service, **overrides):
 # ---------- create ----------
 
 
-def test_create_job(client, customer, service):
+def test_create_job(client, admin_user, customer, service):
     response = create(
         client,
         customer,
@@ -45,7 +45,7 @@ def test_create_job(client, customer, service):
     assert body["title"] == "Vehicle Registration Renewal"
     assert body["description"] == "Renewal application"
     assert body["due_date"] == "2026-11-25"
-    assert body["created_by"] is None
+    assert body["created_by"] == admin_user.id
     assert body["customer"] == {
         "id": customer.id,
         "name": "Asha Test",
@@ -448,3 +448,57 @@ def test_description_length_limit(client, customer, service, job):
         f"/api/v1/jobs/{job['id']}", json={"description": "x" * 5001}
     )
     assert response.status_code == 422
+
+
+# ---------- access control (auth step 1.0) ----------
+
+
+def test_jobs_require_sign_in(anon_client, job):
+    assert anon_client.get("/api/v1/jobs").status_code == 401
+    assert anon_client.get(f"/api/v1/jobs/{job['id']}").status_code == 401
+    assert anon_client.post("/api/v1/jobs", json={}).status_code == 401
+    response = anon_client.patch(f"/api/v1/jobs/{job['id']}", json={"title": "X"})
+    assert response.status_code == 401
+
+
+def test_employee_can_view_and_create_jobs(
+    employee_client, employee_user, customer, service, job
+):
+    assert employee_client.get("/api/v1/jobs").json()["total"] >= 1
+    assert employee_client.get(f"/api/v1/jobs/{job['id']}").status_code == 200
+
+    response = create(employee_client, customer, service, title="By employee")
+    assert response.status_code == 201
+    assert response.json()["created_by"] == employee_user.id
+
+
+def test_employee_cannot_edit_jobs(employee_client, job):
+    response = employee_client.patch(f"/api/v1/jobs/{job['id']}", json={"title": "X"})
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Admin access required."}
+
+
+def test_job_write_requires_csrf(client, customer, service):
+    del client.headers["X-CSRF-Token"]
+    assert create(client, customer, service).status_code == 403
+
+
+def test_job_changes_are_audited(client, admin_user, db_session, job):
+    client.patch(f"/api/v1/jobs/{job['id']}", json={"title": "Audited"})
+
+    entries = db_session.scalars(
+        select(AuditLog)
+        .where(AuditLog.entity_type == "job", AuditLog.entity_id == job["id"])
+        .order_by(AuditLog.id)
+    ).all()
+    assert [e.action for e in entries] == ["job_created", "job_updated"]
+    assert all(e.user_id == admin_user.id for e in entries)
+    assert '"title"' in entries[1].details
+
+
+def test_unchanged_patch_writes_no_audit(client, db_session, job):
+    client.patch(f"/api/v1/jobs/{job['id']}", json={"title": job["title"]})
+    actions = db_session.scalars(
+        select(AuditLog.action).where(AuditLog.entity_id == job["id"])
+    ).all()
+    assert actions == ["job_created"]
