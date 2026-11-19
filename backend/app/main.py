@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.api.v1.router import api_router
+from app.services.errors import ServiceError
 
 app = FastAPI(
     title="CSC Business CRM API",
@@ -26,3 +30,11 @@ def api_health():
         "status": "ok",
         "service": "csc-business-crm-api",
     }
+
+
+@app.exception_handler(ServiceError)
+def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+app.include_router(api_router)

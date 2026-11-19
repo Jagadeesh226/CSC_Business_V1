@@ -6,6 +6,7 @@ from app.models.job_assignment import JobAssignment
 from app.models.job_fee import JobFee
 from app.models.job_status_history import JobStatusHistory
 from app.models.payment import Payment
+from app.models.sequence_counter import SequenceCounter
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
 from app.models.service_document_requirement import ServiceDocumentRequirement
@@ -21,6 +22,7 @@ __all__ = [
     "JobFee",
     "JobStatusHistory",
     "Payment",
+    "SequenceCounter",
     "Service",
     "ServiceCategory",
     "ServiceDocumentRequirement",
