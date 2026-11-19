@@ -12,6 +12,7 @@ from app.models.service_category import ServiceCategory
 from app.models.service_document_requirement import ServiceDocumentRequirement
 from app.models.service_field_definition import ServiceFieldDefinition
 from app.models.user import User
+from app.models.user_session import UserSession
 
 __all__ = [
     "AuditLog",
@@ -28,4 +29,5 @@ __all__ = [
     "ServiceDocumentRequirement",
     "ServiceFieldDefinition",
     "User",
+    "UserSession",
 ]

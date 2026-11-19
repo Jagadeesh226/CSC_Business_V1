@@ -64,7 +64,7 @@ def _truncate(engine) -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE jobs, sequence_counters, customers, services, "
+                "TRUNCATE audit_logs, jobs, sequence_counters, customers, services, "
                 "service_categories RESTART IDENTITY CASCADE"
             )
         )
