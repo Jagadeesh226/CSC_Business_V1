@@ -195,6 +195,27 @@ def get_active_assignment(
     )
 
 
+def end_assignment(
+    db: Session, job_id: int, user_id: int, actor_id: int, now: datetime
+) -> bool:
+    """End the active assignment in one conditional UPDATE.
+
+    Returns False if there was none, including when a concurrent request
+    ended it first, so a removal is recorded and audited exactly once.
+    """
+    ended = db.scalar(
+        update(JobAssignment)
+        .where(
+            JobAssignment.job_id == job_id,
+            JobAssignment.user_id == user_id,
+            JobAssignment.unassigned_at.is_(None),
+        )
+        .values(unassigned_at=now, unassigned_by=actor_id)
+        .returning(JobAssignment.id)
+    )
+    return ended is not None
+
+
 def add_assignment(db: Session, assignment: JobAssignment) -> JobAssignment:
     db.add(assignment)
     db.flush()

@@ -98,7 +98,7 @@ class JobRead(BaseModel):
     # Nullable only for legacy rows; jobs created through the API always have one.
     service: ServiceRef | None
     # People currently assigned to the job.
-    assignees: list[AssigneeRef] = []
+    assignees: list[AssigneeRef]
 
 
 class JobListResponse(BaseModel):

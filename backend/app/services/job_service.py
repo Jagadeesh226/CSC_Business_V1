@@ -231,7 +231,9 @@ def assign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRead:
     job = repo.get_job(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    user = user_repository.get_user(db, user_id)
+    # Locked so a concurrent deactivation cannot slip between this check and
+    # the insert (it would miss the not-yet-committed assignment).
+    user = user_repository.get_user_for_update(db, user_id)
     if user is None:
         raise NotFoundError("User not found.")
     if not user.is_active:
@@ -255,11 +257,8 @@ def unassign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRea
     """Admin removes a person from a job; the row is kept as history."""
     if repo.get_job(db, job_id) is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    assignment = repo.get_active_assignment(db, job_id, user_id)
-    if assignment is None:
+    if not repo.end_assignment(db, job_id, user_id, actor.id, datetime.now(UTC)):
         raise NotFoundError("This user is not assigned to the job.")
-    assignment.unassigned_at = datetime.now(UTC)
-    assignment.unassigned_by = actor.id
     audit_service.record(
         db,
         action="job_unassigned",

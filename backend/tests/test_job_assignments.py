@@ -1,5 +1,6 @@
 import json
 import threading
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -16,9 +17,10 @@ from app.models import (
     ServiceCategory,
     User,
 )
+from app.repositories import job_repository
 from app.schemas.job import JobCreate
 from app.services import job_service
-from app.services.errors import ConflictError
+from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 
 JOBS = "/api/v1/jobs"
 
@@ -386,3 +388,80 @@ def test_concurrent_assignment_of_same_user(test_engine, committed_job):
             )
         ).all()
     assert len(active) == 1
+
+
+def _run_while_locked(holder: Session, target):
+    """Run ``target`` in a thread while ``holder`` keeps its row lock, check it
+    is waiting on that lock, then commit ``holder`` and return the outcome.
+
+    ``holder`` is always closed, so a failing assertion cannot leave a lock
+    behind that would hang the cleanup.
+    """
+    result: dict[str, object] = {}
+
+    def run() -> None:
+        try:
+            result["value"] = target()
+        except Exception as exc:  # noqa: BLE001 - inspected by the caller
+            result["error"] = exc
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    try:
+        thread.join(timeout=1)
+        blocked = thread.is_alive()
+        holder.commit()
+    finally:
+        holder.close()
+        thread.join(timeout=10)
+    assert blocked, f"expected to wait on the row lock, got {result}"
+    return result
+
+
+def test_assign_waits_for_concurrent_deactivation(test_engine, committed_job):
+    """Review M-1: a deactivation in flight must not miss a new assignment."""
+    job_id, admin_id, employee_id = committed_job
+    deactivator = Session(test_engine)
+    deactivator.get(User, employee_id).is_active = False
+    deactivator.flush()  # row-locks the user, not yet committed
+
+    def assign_in_other_session():
+        with Session(test_engine) as session:
+            admin = session.get(User, admin_id)
+            return job_service.assign_user(session, job_id, employee_id, actor=admin)
+
+    result = _run_while_locked(deactivator, assign_in_other_session)
+
+    assert isinstance(result.get("error"), BusinessRuleError), result
+    with Session(test_engine) as session:
+        assert session.scalars(select(JobAssignment)).all() == []
+
+
+def test_concurrent_unassign_is_recorded_once(test_engine, committed_job):
+    """Review L-1: two admins removing the same person: only one succeeds."""
+    job_id, admin_id, employee_id = committed_job
+    with Session(test_engine) as session:
+        admin = session.get(User, admin_id)
+        job_service.assign_user(session, job_id, employee_id, actor=admin)
+
+    # The first removal holds the assignment row locked, uncommitted.
+    first = Session(test_engine)
+    assert job_repository.end_assignment(
+        first, job_id, employee_id, admin_id, datetime.now(UTC)
+    )
+
+    def second_removal():
+        with Session(test_engine) as session:
+            admin = session.get(User, admin_id)
+            return job_service.unassign_user(session, job_id, employee_id, actor=admin)
+
+    result = _run_while_locked(first, second_removal)
+
+    assert isinstance(result.get("error"), NotFoundError), result
+    with Session(test_engine) as session:
+        audited = session.scalars(
+            select(AuditLog).where(AuditLog.action == "job_unassigned")
+        ).all()
+    # The first removal was a bare repository call, so no audit row: the
+    # second must not have written one either.
+    assert audited == []
