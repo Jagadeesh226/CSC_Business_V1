@@ -11,9 +11,17 @@ def get_user(db: Session, user_id: int) -> User | None:
 
 
 def get_user_for_update(db: Session, user_id: int) -> User | None:
-    """Row-lock the user until the transaction ends (serialises against
-    concurrent deactivation)."""
-    return db.scalar(select(User).where(User.id == user_id).with_for_update())
+    """Row-lock the user until the transaction ends and re-read its values.
+
+    Lock order: callers lock job rows before user rows (see job_service), so
+    assignment and deactivation can never deadlock each other.
+    """
+    return db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:

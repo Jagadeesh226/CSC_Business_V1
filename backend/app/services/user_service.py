@@ -173,21 +173,34 @@ def deactivate_user(db: Session, actor: User, user_id: int) -> UserRead:
     user = _get(db, user_id)
     if user.id == actor.id:
         raise BusinessRuleError("You cannot deactivate your own account.")
-    if user.is_active:
-        if user.role == UserRole.ADMIN.value:
-            _ensure_not_last_admin(db, user)
-        user.is_active = False
-        repo.revoke_sessions(db, user.id, datetime.now(UTC))
-        audit_service.record(
-            db,
-            action="user_deactivated",
-            entity_type="user",
-            entity_id=user.id,
-            user_id=actor.id,
-        )
-        # Open jobs should not sit with someone who can no longer sign in.
-        job_service.unassign_from_open_jobs(db, user.id, actor)
-        db.commit()
+    if not user.is_active:
+        return UserRead.model_validate(user)
+
+    # Lock order everywhere: job rows first, then user rows (as assign_user
+    # does), so deactivation and assignment never deadlock. Holding these
+    # locks, a concurrent assignment or job closure waits for us, or we wait
+    # for it and then see its result.
+    open_job_ids = job_service.lock_open_jobs_of(db, user.id)
+    user = repo.get_user_for_update(db, user.id)
+    if user is None or not user.is_active:
+        db.rollback()
+        return UserRead.model_validate(_get(db, user_id))
+    if user.role == UserRole.ADMIN.value:
+        _ensure_not_last_admin(db, user)
+
+    user.is_active = False
+    db.flush()
+    repo.revoke_sessions(db, user.id, datetime.now(UTC))
+    audit_service.record(
+        db,
+        action="user_deactivated",
+        entity_type="user",
+        entity_id=user.id,
+        user_id=actor.id,
+    )
+    # Open jobs should not sit with someone who can no longer sign in.
+    job_service.unassign_from_jobs(db, user.id, open_job_ids, actor)
+    db.commit()
     return UserRead.model_validate(user)
 
 

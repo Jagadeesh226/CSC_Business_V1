@@ -32,6 +32,24 @@ class JobStatus(StrEnum):
 # Jobs in these statuses are closed: no new assignments, never reopened.
 FINAL_STATUSES = (JobStatus.COMPLETED.value, JobStatus.CANCELLED.value)
 
+# Normal moves (docs/contracts/decisions.md section 7). Cancelling is a
+# separate admin-only action, allowed from any status that is not final.
+STATUS_TRANSITIONS: dict[str, tuple[JobStatus, ...]] = {
+    JobStatus.PENDING.value: (JobStatus.IN_PROGRESS,),
+    JobStatus.IN_PROGRESS.value: (
+        JobStatus.WAITING_FOR_DOCUMENTS,
+        JobStatus.SUBMITTED,
+    ),
+    JobStatus.WAITING_FOR_DOCUMENTS.value: (JobStatus.IN_PROGRESS,),
+    JobStatus.SUBMITTED.value: (JobStatus.COMPLETED,),
+    JobStatus.COMPLETED.value: (),
+    JobStatus.CANCELLED.value: (),
+}
+
+Reason = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
+]
+
 
 class JobCreate(BaseModel):
     # Unknown fields (job_number, status, created_by, ...) are rejected with 422.
@@ -99,6 +117,9 @@ class JobRead(BaseModel):
     service: ServiceRef | None
     # People currently assigned to the job.
     assignees: list[AssigneeRef]
+    # Statuses the job can move to next with POST /jobs/{id}/status.
+    # Cancelling (admins only) is separate and possible while not final.
+    allowed_next_statuses: list[JobStatus]
 
 
 class JobListResponse(BaseModel):
@@ -122,3 +143,25 @@ class AssignmentRead(BaseModel):
     assigned_at: datetime
     unassigned_by: AssigneeRef | None
     unassigned_at: datetime | None
+
+
+class StatusChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: JobStatus
+    reason: Reason | None = None
+
+
+class CancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Reason
+
+
+class StatusHistoryRead(BaseModel):
+    id: int
+    old_status: JobStatus | None
+    new_status: JobStatus
+    changed_by: AssigneeRef | None
+    reason: str | None
+    changed_at: datetime

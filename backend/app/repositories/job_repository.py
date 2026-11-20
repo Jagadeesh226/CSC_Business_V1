@@ -16,7 +16,15 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from app.models import Customer, Job, JobAssignment, SequenceCounter, Service, User
+from app.models import (
+    Customer,
+    Job,
+    JobAssignment,
+    JobStatusHistory,
+    SequenceCounter,
+    Service,
+    User,
+)
 
 JobRow = Row[tuple[Job, Customer, Service | None]]
 
@@ -31,6 +39,20 @@ def get_service(db: Session, service_id: int) -> Service | None:
 
 def get_job(db: Session, job_id: int) -> Job | None:
     return db.get(Job, job_id)
+
+
+def get_job_for_update(db: Session, job_id: int) -> Job | None:
+    """Row-lock the job until the transaction ends.
+
+    Every write that depends on the job's status takes this lock, so status
+    changes, edits and assignment changes on one job happen one at a time.
+    """
+    return db.scalar(
+        select(Job)
+        .where(Job.id == job_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
 
 
 def current_year(db: Session, timezone: str, at: datetime | None = None) -> int:
@@ -256,27 +278,65 @@ def list_assignments(db: Session, job_id: int) -> list[AssignmentRow]:
     )
 
 
-def unassign_from_open_jobs(
-    db: Session,
-    user_id: int,
-    actor_id: int,
-    now: datetime,
-    final_statuses: tuple[str, ...],
+def lock_open_jobs_assigned_to(
+    db: Session, user_id: int, final_statuses: tuple[str, ...]
 ) -> list[int]:
-    """End the user's active assignments on jobs that are not final.
+    """Row-lock the open jobs the user is actively assigned to, in id order.
 
-    Returns the affected job ids.
+    A job being closed concurrently is waited for and then re-checked, so it
+    is skipped once it is completed or cancelled.
     """
-    open_job_ids = select(Job.id).where(Job.status.not_in(final_statuses))
+    return list(
+        db.scalars(
+            select(Job.id)
+            .join(JobAssignment, JobAssignment.job_id == Job.id)
+            .where(
+                JobAssignment.user_id == user_id,
+                JobAssignment.unassigned_at.is_(None),
+                Job.status.not_in(final_statuses),
+            )
+            .order_by(Job.id)
+            .with_for_update(of=Job)
+        )
+    )
+
+
+def end_assignments_on_jobs(
+    db: Session, user_id: int, job_ids: list[int], actor_id: int, now: datetime
+) -> list[int]:
+    """End the user's active assignments on the given (locked) jobs."""
+    if not job_ids:
+        return []
     return list(
         db.scalars(
             update(JobAssignment)
             .where(
                 JobAssignment.user_id == user_id,
                 JobAssignment.unassigned_at.is_(None),
-                JobAssignment.job_id.in_(open_job_ids),
+                JobAssignment.job_id.in_(job_ids),
             )
             .values(unassigned_at=now, unassigned_by=actor_id)
             .returning(JobAssignment.job_id)
         )
+    )
+
+
+# ---------- status history ----------
+
+
+def add_status_history(db: Session, entry: JobStatusHistory) -> None:
+    db.add(entry)
+    db.flush()
+
+
+def list_status_history(
+    db: Session, job_id: int
+) -> list[Row[tuple[JobStatusHistory, User | None]]]:
+    return list(
+        db.execute(
+            select(JobStatusHistory, User)
+            .outerjoin(User, JobStatusHistory.changed_by == User.id)
+            .where(JobStatusHistory.job_id == job_id)
+            .order_by(JobStatusHistory.id)  # ids follow the job lock; times may not
+        ).all()
     )

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -8,6 +8,13 @@ from app.db.base import Base
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'waiting_for_documents', "
+            "'submitted', 'completed', 'cancelled')",
+            name="ck_jobs_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     job_number: Mapped[str] = mapped_column(
