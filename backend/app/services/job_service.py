@@ -4,12 +4,13 @@ from datetime import UTC, date, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Job, JobAssignment, User
+from app.models import Job, JobAssignment, JobStatusHistory, User
 from app.repositories import job_repository as repo
 from app.repositories import user_repository
 from app.repositories.job_repository import JobRow
 from app.schemas.job import (
     FINAL_STATUSES,
+    STATUS_TRANSITIONS,
     AssigneeRef,
     AssignmentRead,
     CustomerRef,
@@ -19,6 +20,7 @@ from app.schemas.job import (
     JobStatus,
     JobUpdate,
     ServiceRef,
+    StatusHistoryRead,
 )
 from app.schemas.user import UserRole
 from app.services import audit_service
@@ -67,6 +69,7 @@ def _to_read(row: JobRow, assignees: list[User]) -> JobRead:
         customer=CustomerRef.model_validate(customer),
         service=ServiceRef.model_validate(service) if service is not None else None,
         assignees=[AssigneeRef.model_validate(u) for u in assignees],
+        allowed_next_statuses=list(STATUS_TRANSITIONS.get(job.status, ())),
     )
 
 
@@ -118,6 +121,16 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
                     due_date=data.due_date,
                     status=JobStatus.PENDING.value,
                     created_by=created_by,
+                ),
+            )
+            # Every job's history starts at creation.
+            repo.add_status_history(
+                db,
+                JobStatusHistory(
+                    job_id=job.id,
+                    old_status=None,
+                    new_status=job.status,
+                    changed_by=created_by,
                 ),
             )
             audit_service.record(
@@ -177,7 +190,7 @@ def list_jobs(
 def update_job(
     db: Session, job_id: int, data: JobUpdate, actor: User | None = None
 ) -> JobRead:
-    job = repo.get_job(db, job_id)
+    job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
     _ensure_job_access(db, job_id, actor)
@@ -231,11 +244,12 @@ def _assign(
 
 def assign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRead:
     """Admin assigns an active user (admin or employee) to an open job."""
-    job = repo.get_job(db, job_id)
+    job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    # Locked so a concurrent deactivation cannot slip between this check and
-    # the insert (it would miss the not-yet-committed assignment).
+    # Lock order everywhere: the job row (taken above), then the user row.
+    # Locking the user means a concurrent deactivation cannot slip between
+    # this check and the insert.
     user = user_repository.get_user_for_update(db, user_id)
     if user is None:
         raise NotFoundError("User not found.")
@@ -261,7 +275,7 @@ def unassign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRea
 
     Closed jobs keep their assignments as the record of who did the work.
     """
-    job = repo.get_job(db, job_id)
+    job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
     if job.status in FINAL_STATUSES:
@@ -299,10 +313,19 @@ def list_assignments(
     ]
 
 
-def unassign_from_open_jobs(db: Session, user_id: int, actor: User) -> None:
-    """Remove a deactivated user from every open job (caller commits)."""
-    for job_id in repo.unassign_from_open_jobs(
-        db, user_id, actor.id, datetime.now(UTC), FINAL_STATUSES
+def lock_open_jobs_of(db: Session, user_id: int) -> list[int]:
+    """First step of deactivation: lock the user's open jobs (job rows are
+    always locked before user rows)."""
+    return repo.lock_open_jobs_assigned_to(db, user_id, FINAL_STATUSES)
+
+
+def unassign_from_jobs(
+    db: Session, user_id: int, job_ids: list[int], actor: User
+) -> None:
+    """Remove a deactivated user from the given locked open jobs (caller
+    commits)."""
+    for job_id in repo.end_assignments_on_jobs(
+        db, user_id, job_ids, actor.id, datetime.now(UTC)
     ):
         audit_service.record(
             db,
@@ -312,3 +335,96 @@ def unassign_from_open_jobs(db: Session, user_id: int, actor: User) -> None:
             user_id=actor.id,
             details={"user_id": user_id, "reason": "user_deactivated"},
         )
+
+
+# ---------- status changes ----------
+
+
+def _record_status_change(
+    db: Session, job: Job, new_status: str, actor: User, reason: str | None
+) -> None:
+    old_status = job.status
+    job.status = new_status
+    repo.add_status_history(
+        db,
+        JobStatusHistory(
+            job_id=job.id,
+            old_status=old_status,
+            new_status=new_status,
+            changed_by=actor.id,
+            reason=reason,
+        ),
+    )
+    details: dict[str, object] = {"from": old_status, "to": new_status}
+    if reason:
+        details["reason"] = reason
+    audit_service.record(
+        db,
+        action="job_cancelled"
+        if new_status == JobStatus.CANCELLED.value
+        else "job_status_changed",
+        entity_type="job",
+        entity_id=job.id,
+        user_id=actor.id,
+        details=details,
+    )
+
+
+def change_status(
+    db: Session,
+    job_id: int,
+    new_status: JobStatus,
+    actor: User,
+    reason: str | None = None,
+) -> JobRead:
+    """Move a job to its next status. Admins: any job; employees: assigned.
+
+    The job row is locked, so concurrent changes are applied one at a time and
+    the later one is checked against the status the earlier one left.
+    """
+    job = repo.get_job_for_update(db, job_id)
+    if job is None:
+        raise NotFoundError(JOB_NOT_FOUND)
+    _ensure_job_access(db, job_id, actor)
+    if new_status == JobStatus.CANCELLED:
+        raise BusinessRuleError("Use the cancel action to cancel a job.")
+    allowed = STATUS_TRANSITIONS.get(job.status, ())
+    if new_status not in allowed:
+        if not allowed:
+            raise BusinessRuleError(f"A {job.status} job cannot change status.")
+        options = ", ".join(s.value for s in allowed)
+        raise BusinessRuleError(f"A {job.status} job can only move to: {options}.")
+    _record_status_change(db, job, new_status.value, actor, reason)
+    db.commit()
+    return get_job(db, job_id)
+
+
+def cancel_job(db: Session, job_id: int, actor: User, reason: str) -> JobRead:
+    """Admin-only (enforced by the route): cancel any job that is not final."""
+    job = repo.get_job_for_update(db, job_id)
+    if job is None:
+        raise NotFoundError(JOB_NOT_FOUND)
+    if job.status in FINAL_STATUSES:
+        raise BusinessRuleError(f"A {job.status} job cannot be cancelled.")
+    _record_status_change(db, job, JobStatus.CANCELLED.value, actor, reason)
+    db.commit()
+    return get_job(db, job_id)
+
+
+def list_status_history(
+    db: Session, job_id: int, viewer: User | None = None
+) -> list[StatusHistoryRead]:
+    if repo.get_job(db, job_id) is None:
+        raise NotFoundError(JOB_NOT_FOUND)
+    _ensure_job_access(db, job_id, viewer)
+    return [
+        StatusHistoryRead(
+            id=entry.id,
+            old_status=entry.old_status,
+            new_status=entry.new_status,
+            changed_by=AssigneeRef.model_validate(user) if user else None,
+            reason=entry.reason,
+            changed_at=entry.changed_at,
+        )
+        for entry, user in repo.list_status_history(db, job_id)
+    ]
