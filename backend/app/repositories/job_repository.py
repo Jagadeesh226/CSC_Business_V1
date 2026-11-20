@@ -16,7 +16,15 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from app.models import Customer, Job, JobAssignment, SequenceCounter, Service, User
+from app.models import (
+    Customer,
+    Job,
+    JobAssignment,
+    JobStatusHistory,
+    SequenceCounter,
+    Service,
+    User,
+)
 
 JobRow = Row[tuple[Job, Customer, Service | None]]
 
@@ -31,6 +39,20 @@ def get_service(db: Session, service_id: int) -> Service | None:
 
 def get_job(db: Session, job_id: int) -> Job | None:
     return db.get(Job, job_id)
+
+
+def get_job_for_update(db: Session, job_id: int) -> Job | None:
+    """Row-lock the job until the transaction ends.
+
+    Every write that depends on the job's status takes this lock, so status
+    changes, edits and assignment changes on one job happen one at a time.
+    """
+    return db.scalar(
+        select(Job)
+        .where(Job.id == job_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
 
 
 def current_year(db: Session, timezone: str, at: datetime | None = None) -> int:
@@ -279,4 +301,25 @@ def unassign_from_open_jobs(
             .values(unassigned_at=now, unassigned_by=actor_id)
             .returning(JobAssignment.job_id)
         )
+    )
+
+
+# ---------- status history ----------
+
+
+def add_status_history(db: Session, entry: JobStatusHistory) -> None:
+    db.add(entry)
+    db.flush()
+
+
+def list_status_history(
+    db: Session, job_id: int
+) -> list[Row[tuple[JobStatusHistory, User | None]]]:
+    return list(
+        db.execute(
+            select(JobStatusHistory, User)
+            .outerjoin(User, JobStatusHistory.changed_by == User.id)
+            .where(JobStatusHistory.job_id == job_id)
+            .order_by(JobStatusHistory.changed_at, JobStatusHistory.id)
+        ).all()
     )

@@ -11,11 +11,14 @@ from app.schemas.job import (
     MAX_DB_INT,
     AssignmentCreate,
     AssignmentRead,
+    CancelRequest,
     JobCreate,
     JobListResponse,
     JobRead,
     JobStatus,
     JobUpdate,
+    StatusChangeRequest,
+    StatusHistoryRead,
 )
 from app.services import job_service
 
@@ -197,3 +200,41 @@ def unassign_user(
     db: DbSession,
 ) -> JobRead:
     return job_service.unassign_user(db, job_id, user_id, actor=admin)
+
+
+# ---------- status (employees: assigned jobs; cancel: admins) ----------
+
+
+@router.post(
+    "/{job_id}/status",
+    response_model=JobRead,
+    responses={**NOT_FOUND, 422: RULE_422},
+)
+def change_status(
+    job_id: JobId, payload: StatusChangeRequest, user: CurrentUser, db: DbSession
+) -> JobRead:
+    return job_service.change_status(
+        db, job_id, payload.status, actor=user, reason=payload.reason
+    )
+
+
+@router.post(
+    "/{job_id}/cancel",
+    response_model=JobRead,
+    responses={**NOT_FOUND, 422: RULE_422},
+)
+def cancel_job(
+    job_id: JobId, payload: CancelRequest, admin: AdminUser, db: DbSession
+) -> JobRead:
+    return job_service.cancel_job(db, job_id, actor=admin, reason=payload.reason)
+
+
+@router.get(
+    "/{job_id}/status-history",
+    response_model=list[StatusHistoryRead],
+    responses=NOT_FOUND,
+)
+def list_status_history(
+    job_id: JobId, user: CurrentUser, db: DbSession
+) -> list[StatusHistoryRead]:
+    return job_service.list_status_history(db, job_id, viewer=user)
