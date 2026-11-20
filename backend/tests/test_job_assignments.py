@@ -465,3 +465,40 @@ def test_concurrent_unassign_is_recorded_once(test_engine, committed_job):
     # The first removal was a bare repository call, so no audit row: the
     # second must not have written one either.
     assert audited == []
+
+
+# ---------- closed jobs (owner decision) ----------
+
+
+@pytest.mark.parametrize("status", ["completed", "cancelled"])
+def test_closed_jobs_are_read_only_for_employees(
+    client, employee_client, employee_user, job, db_session, status
+):
+    assign(client, job["id"], employee_user.id)
+    db_session.get(Job, job["id"]).status = status
+    db_session.flush()
+
+    response = employee_client.patch(f"{JOBS}/{job['id']}", json={"title": "Late"})
+    assert response.status_code == 422
+    assert response.json() == {"detail": f"A {status} job cannot be edited."}
+    # Still visible to the employee, just not editable.
+    assert employee_client.get(f"{JOBS}/{job['id']}").status_code == 200
+    # Admins can still correct a closed job.
+    admin_edit = client.patch(f"{JOBS}/{job['id']}", json={"title": "Fixed"})
+    assert admin_edit.status_code == 200
+
+
+@pytest.mark.parametrize("status", ["completed", "cancelled"])
+def test_cannot_remove_people_from_closed_jobs(
+    client, employee_user, job, db_session, status
+):
+    assign(client, job["id"], employee_user.id)
+    db_session.get(Job, job["id"]).status = status
+    db_session.flush()
+
+    response = client.delete(f"{JOBS}/{job['id']}/assignments/{employee_user.id}")
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": f"Cannot remove people from a {status} job."}
+    assignees = client.get(f"{JOBS}/{job['id']}").json()["assignees"]
+    assert [a["id"] for a in assignees] == [employee_user.id]

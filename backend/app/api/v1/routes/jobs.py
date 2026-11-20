@@ -30,6 +30,22 @@ MAX_PAGE = 1_000_000
 
 NOT_FOUND = {404: {"model": ErrorResponse, "description": "Job not found"}}
 
+# Business-rule 422s return {"detail": "<message>"}; request-validation 422s
+# return FastAPI's list-shaped detail. Document both.
+RULE_422 = {
+    "description": "Validation error, or a business rule (e.g. the job is closed)",
+    "content": {
+        "application/json": {
+            "schema": {
+                "anyOf": [
+                    {"$ref": "#/components/schemas/HTTPValidationError"},
+                    {"$ref": "#/components/schemas/ErrorResponse"},
+                ]
+            }
+        }
+    },
+}
+
 # Business-rule 422s (inactive service) return {"detail": "<message>"}, while
 # request-validation 422s return FastAPI's list-shaped detail. Document both.
 CREATE_422 = {
@@ -103,7 +119,11 @@ def get_job(job_id: JobId, user: CurrentUser, db: DbSession) -> JobRead:
     return job_service.get_job(db, job_id, viewer=user)
 
 
-@router.patch("/{job_id}", response_model=JobRead, responses=NOT_FOUND)
+@router.patch(
+    "/{job_id}",
+    response_model=JobRead,
+    responses={**NOT_FOUND, 422: RULE_422},
+)
 def update_job(
     job_id: JobId, payload: JobUpdate, user: CurrentUser, db: DbSession
 ) -> JobRead:
@@ -135,19 +155,7 @@ def _parse_assigned_to(value: str | None, user: User) -> int | None:
 ASSIGN_RESPONSES = {
     404: {"model": ErrorResponse, "description": "Job or user not found"},
     409: {"model": ErrorResponse, "description": "User already assigned"},
-    422: {
-        "description": "Validation error, inactive user, or job is closed",
-        "content": {
-            "application/json": {
-                "schema": {
-                    "anyOf": [
-                        {"$ref": "#/components/schemas/HTTPValidationError"},
-                        {"$ref": "#/components/schemas/ErrorResponse"},
-                    ]
-                }
-            }
-        },
-    },
+    422: RULE_422,
 }
 
 
@@ -178,7 +186,8 @@ def assign_user(
     "/{job_id}/assignments/{user_id}",
     response_model=JobRead,
     responses={
-        404: {"model": ErrorResponse, "description": "Job or assignment not found"}
+        404: {"model": ErrorResponse, "description": "Job or assignment not found"},
+        422: RULE_422,
     },
 )
 def unassign_user(

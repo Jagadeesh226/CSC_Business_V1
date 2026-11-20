@@ -181,6 +181,9 @@ def update_job(
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
     _ensure_job_access(db, job_id, actor)
+    # Closed jobs are read-only for employees; admins can still correct them.
+    if job.status in FINAL_STATUSES and actor is not None and not _is_admin(actor):
+        raise BusinessRuleError(f"A {job.status} job cannot be edited.")
 
     changed = {
         field: value
@@ -254,9 +257,15 @@ def assign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRead:
 
 
 def unassign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRead:
-    """Admin removes a person from a job; the row is kept as history."""
-    if repo.get_job(db, job_id) is None:
+    """Admin removes a person from an open job; the row is kept as history.
+
+    Closed jobs keep their assignments as the record of who did the work.
+    """
+    job = repo.get_job(db, job_id)
+    if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
+    if job.status in FINAL_STATUSES:
+        raise BusinessRuleError(f"Cannot remove people from a {job.status} job.")
     if not repo.end_assignment(db, job_id, user_id, actor.id, datetime.now(UTC)):
         raise NotFoundError("This user is not assigned to the job.")
     audit_service.record(
