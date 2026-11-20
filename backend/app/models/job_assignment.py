@@ -30,3 +30,7 @@ class JobAssignment(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     unassigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who removed the person; set together with unassigned_at.
+    unassigned_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", name="fk_job_assignments_unassigned_by_users")
+    )

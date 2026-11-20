@@ -6,15 +6,17 @@ from sqlalchemy import (
     DateTime,
     Row,
     cast,
+    exists,
     func,
     literal,
     or_,
     select,
+    update,
 )
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
-from app.models import Customer, Job, SequenceCounter, Service
+from app.models import Customer, Job, JobAssignment, SequenceCounter, Service, User
 
 JobRow = Row[tuple[Job, Customer, Service | None]]
 
@@ -120,7 +122,12 @@ def list_jobs(
     service_id: int | None = None,
     status: str | None = None,
     due_date: date | None = None,
+    assigned_to: int | None = None,
+    visible_to: int | None = None,
 ) -> tuple[list[JobRow], int]:
+    """``visible_to`` limits results to jobs that user is actively assigned to
+    (employee access); ``assigned_to`` is the same condition used as a filter.
+    """
     conditions: list[ColumnElement[bool]] = []
     if search:
         pattern = f"%{_escape_like(search)}%"
@@ -138,6 +145,8 @@ def list_jobs(
         conditions.append(Job.status == status)
     if due_date is not None:
         conditions.append(Job.due_date == due_date)
+    for user_id in {u for u in (assigned_to, visible_to) if u is not None}:
+        conditions.append(_actively_assigned(user_id))
 
     total = db.scalar(select(func.count()).select_from(Job).where(*conditions))
     rows = db.execute(
@@ -148,3 +157,126 @@ def list_jobs(
         .limit(limit)
     ).all()
     return list(rows), int(total or 0)
+
+
+# ---------- assignments ----------
+
+
+def _actively_assigned(user_id: int) -> ColumnElement[bool]:
+    return exists().where(
+        JobAssignment.job_id == Job.id,
+        JobAssignment.user_id == user_id,
+        JobAssignment.unassigned_at.is_(None),
+    )
+
+
+def is_actively_assigned(db: Session, job_id: int, user_id: int) -> bool:
+    return (
+        db.scalar(
+            select(JobAssignment.id).where(
+                JobAssignment.job_id == job_id,
+                JobAssignment.user_id == user_id,
+                JobAssignment.unassigned_at.is_(None),
+            )
+        )
+        is not None
+    )
+
+
+def get_active_assignment(
+    db: Session, job_id: int, user_id: int
+) -> JobAssignment | None:
+    return db.scalar(
+        select(JobAssignment).where(
+            JobAssignment.job_id == job_id,
+            JobAssignment.user_id == user_id,
+            JobAssignment.unassigned_at.is_(None),
+        )
+    )
+
+
+def end_assignment(
+    db: Session, job_id: int, user_id: int, actor_id: int, now: datetime
+) -> bool:
+    """End the active assignment in one conditional UPDATE.
+
+    Returns False if there was none, including when a concurrent request
+    ended it first, so a removal is recorded and audited exactly once.
+    """
+    ended = db.scalar(
+        update(JobAssignment)
+        .where(
+            JobAssignment.job_id == job_id,
+            JobAssignment.user_id == user_id,
+            JobAssignment.unassigned_at.is_(None),
+        )
+        .values(unassigned_at=now, unassigned_by=actor_id)
+        .returning(JobAssignment.id)
+    )
+    return ended is not None
+
+
+def add_assignment(db: Session, assignment: JobAssignment) -> JobAssignment:
+    db.add(assignment)
+    db.flush()
+    return assignment
+
+
+def active_assignees(db: Session, job_ids: list[int]) -> dict[int, list[User]]:
+    """Current assignees for a page of jobs, in one query."""
+    result: dict[int, list[User]] = {job_id: [] for job_id in job_ids}
+    if not job_ids:
+        return result
+    rows = db.execute(
+        select(JobAssignment.job_id, User)
+        .join(User, JobAssignment.user_id == User.id)
+        .where(JobAssignment.job_id.in_(job_ids), JobAssignment.unassigned_at.is_(None))
+        .order_by(JobAssignment.assigned_at, JobAssignment.id)
+    )
+    for job_id, user in rows:
+        result[job_id].append(user)
+    return result
+
+
+AssignmentRow = Row[tuple[JobAssignment, User, User, User | None]]
+
+
+def list_assignments(db: Session, job_id: int) -> list[AssignmentRow]:
+    """Full assignment history of a job, oldest first."""
+    assignee, assigner, remover = aliased(User), aliased(User), aliased(User)
+    return list(
+        db.execute(
+            select(JobAssignment, assignee, assigner, remover)
+            .join(assignee, JobAssignment.user_id == assignee.id)
+            .join(assigner, JobAssignment.assigned_by == assigner.id)
+            .outerjoin(remover, JobAssignment.unassigned_by == remover.id)
+            .where(JobAssignment.job_id == job_id)
+            .order_by(JobAssignment.assigned_at, JobAssignment.id)
+        ).all()
+    )
+
+
+def unassign_from_open_jobs(
+    db: Session,
+    user_id: int,
+    actor_id: int,
+    now: datetime,
+    final_statuses: tuple[str, ...],
+) -> list[int]:
+    """End the user's active assignments on jobs that are not final.
+
+    Returns the affected job ids.
+    """
+    open_job_ids = select(Job.id).where(Job.status.not_in(final_statuses))
+    return list(
+        db.scalars(
+            update(JobAssignment)
+            .where(
+                JobAssignment.user_id == user_id,
+                JobAssignment.unassigned_at.is_(None),
+                JobAssignment.job_id.in_(open_job_ids),
+            )
+            .values(unassigned_at=now, unassigned_by=actor_id)
+            .returning(JobAssignment.job_id)
+        )
+    )
