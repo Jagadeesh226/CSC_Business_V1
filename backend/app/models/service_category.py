@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -8,6 +8,10 @@ from app.db.base import Base
 
 class ServiceCategory(Base):
     __tablename__ = "service_categories"
+    __table_args__ = (
+        # Names are unique regardless of letter case ("Transport"/"transport").
+        Index("uq_service_categories_name_lower", text("lower(name)"), unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
