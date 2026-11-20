@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.customer import Customer
 from app.models.document import Document
+from app.models.document_type import DocumentType
 from app.models.job import Job
 from app.models.job_assignment import JobAssignment
 from app.models.job_fee import JobFee
@@ -18,6 +19,7 @@ __all__ = [
     "AuditLog",
     "Customer",
     "Document",
+    "DocumentType",
     "Job",
     "JobAssignment",
     "JobFee",

@@ -95,6 +95,10 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
         raise NotFoundError("Service not found.")
     if not service.is_active:
         raise BusinessRuleError("Service is inactive and cannot be used for new jobs.")
+    if not repo.service_category_active(db, service):
+        raise BusinessRuleError(
+            "The service's category is inactive, so it cannot be used for new jobs."
+        )
 
     created_by = creator.id if creator is not None else None
     # The second attempt runs only after a collision: if a job number exists
