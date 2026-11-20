@@ -23,6 +23,7 @@ from app.models import (
     JobStatusHistory,
     SequenceCounter,
     Service,
+    ServiceCategory,
     User,
 )
 
@@ -31,6 +32,11 @@ JobRow = Row[tuple[Job, Customer, Service | None]]
 
 def get_customer(db: Session, customer_id: int) -> Customer | None:
     return db.get(Customer, customer_id)
+
+
+def service_category_active(db: Session, service: Service) -> bool:
+    category = db.get(ServiceCategory, service.category_id)
+    return category is not None and category.is_active
 
 
 def get_service(db: Session, service_id: int) -> Service | None:

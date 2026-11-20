@@ -3,8 +3,14 @@
 - New table document_types (code, name, sensitivity, OCR fields).
 - service_document_requirements now points to a document type instead of
   repeating a code and name. Existing rows are converted: one document type
-  is created per distinct code (keeping its name), then linked. The old
+  per distinct upper-cased code (trimmed to the new length limits, keeping
+  the first row's name), then linked. If one service listed the same code
+  twice in different letter cases, only its first row is kept. The old
   columns and unique constraint are replaced by (service_id, document_type_id).
+- Category names become unique regardless of letter case.
+
+Downgrade restores code and name columns from the linked document type, so
+codes come back upper-cased and share one name per code.
 
 Revision ID: f3c7a9e2b1d4
 Revises: e1a2b3c4d5f6
@@ -68,10 +74,10 @@ def upgrade() -> None:
     op.execute(
         """
         INSERT INTO document_types (code, name, is_active, sort_order)
-        SELECT DISTINCT ON (upper(document_code))
-               upper(document_code), document_name, true, 0
+        SELECT DISTINCT ON (left(upper(document_code), 50))
+               left(upper(document_code), 50), left(document_name, 150), true, 0
         FROM service_document_requirements
-        ORDER BY upper(document_code), id
+        ORDER BY left(upper(document_code), 50), id
         """
     )
     op.execute(
@@ -79,12 +85,21 @@ def upgrade() -> None:
         UPDATE service_document_requirements r
         SET document_type_id = t.id
         FROM document_types t
-        WHERE t.code = upper(r.document_code)
+        WHERE t.code = left(upper(r.document_code), 50)
         """
     )
-    op.alter_column(
-        "service_document_requirements", "document_type_id", nullable=False
+    # One service listing the same code twice (e.g. "aadhaar" and "AADHAAR"):
+    # keep the first row so the new unique constraint holds.
+    op.execute(
+        """
+        DELETE FROM service_document_requirements r
+        USING service_document_requirements keep
+        WHERE keep.service_id = r.service_id
+          AND keep.document_type_id = r.document_type_id
+          AND keep.id < r.id
+        """
     )
+    op.alter_column("service_document_requirements", "document_type_id", nullable=False)
     op.create_foreign_key(
         "fk_service_document_requirements_document_type_id",
         "service_document_requirements",
@@ -110,10 +125,17 @@ def upgrade() -> None:
     )
     op.drop_column("service_document_requirements", "document_code")
     op.drop_column("service_document_requirements", "document_name")
+    op.create_index(
+        "uq_service_categories_name_lower",
+        "service_categories",
+        [sa.text("lower(name)")],
+        unique=True,
+    )
 
 
 def downgrade() -> None:
     """Downgrade schema (restores code and name from the linked type)."""
+    op.drop_index("uq_service_categories_name_lower", table_name="service_categories")
     op.add_column(
         "service_document_requirements",
         sa.Column("document_code", sa.String(length=100), nullable=True),

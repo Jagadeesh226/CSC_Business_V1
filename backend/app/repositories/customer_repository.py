@@ -23,14 +23,25 @@ def _escape_like(value: str) -> str:
 
 
 def list_customers(
-    db: Session, *, offset: int, limit: int, search: str | None, search_digits: str
+    db: Session,
+    *,
+    offset: int,
+    limit: int,
+    name_query: str | None,
+    phone_digits: str | None,
 ) -> tuple[list[Customer], int]:
+    """Search either by name or by phone digits, never both at once."""
     conditions: list[ColumnElement[bool]] = []
-    if search:
-        matches = [Customer.name.ilike(f"%{_escape_like(search)}%", escape="\\")]
-        if len(search_digits) >= 4:  # looks like part of a phone number
-            matches.append(_phone_digits().like(f"%{search_digits}%"))
-        conditions.append(or_(*matches))
+    if name_query:
+        conditions.append(
+            Customer.name.ilike(f"%{_escape_like(name_query)}%", escape="\\")
+        )
+    elif phone_digits:
+        if len(phone_digits) >= 10:
+            # A full number: compare the last 10 digits, ignoring +91 or 0.
+            conditions.append(func.right(_phone_digits(), 10) == phone_digits[-10:])
+        else:
+            conditions.append(_phone_digits().like(f"%{phone_digits}%"))
     total = db.scalar(select(func.count()).select_from(Customer).where(*conditions))
     customers = db.scalars(
         select(Customer)

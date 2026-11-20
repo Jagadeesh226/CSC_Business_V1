@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import select
 
@@ -305,3 +307,137 @@ def test_catalogue_changes_are_admin_only(
 )
 def test_catalogue_reads_require_sign_in(anon_client, path):
     assert anon_client.get(API + path).status_code == 401
+
+
+# ---------- review fixes ----------
+
+
+def test_inactive_category_blocks_new_jobs(client, service, category, make_customer):
+    """Review M-1: hidden from the dropdown means unusable for jobs too."""
+    customer = make_customer()
+    client.patch(
+        f"{API}/service-categories/{category['id']}", json={"is_active": False}
+    )
+    response = client.post(
+        f"{API}/jobs",
+        json={"customer_id": customer.id, "service_id": service["id"], "title": "J"},
+    )
+    assert response.status_code == 422
+    assert "category is inactive" in response.json()["detail"]
+
+
+def test_cannot_reactivate_service_in_inactive_category(client, service, category):
+    """Review M-1."""
+    client.patch(f"{API}/services/{service['id']}", json={"is_active": False})
+    client.patch(
+        f"{API}/service-categories/{category['id']}", json={"is_active": False}
+    )
+    response = client.patch(f"{API}/services/{service['id']}", json={"is_active": True})
+    assert response.status_code == 422
+    assert "Reactivate the category first" in response.json()["detail"]
+
+
+def test_retired_document_type_leaves_active_requirements(client, service, aadhaar):
+    """Review L-2."""
+    url = f"{API}/services/{service['id']}/document-requirements"
+    req = client.post(url, json={"document_type_id": aadhaar["id"]}).json()
+    client.patch(f"{API}/document-types/{aadhaar['id']}", json={"is_active": False})
+
+    assert client.get(url, params={"active": True}).json() == []
+    assert [r["id"] for r in client.get(url, params={"active": False}).json()] == [
+        req["id"]
+    ]
+    reactivate = client.patch(f"{url}/{req['id']}", json={"is_active": True})
+    assert reactivate.status_code == 422
+    # Re-adding a type the service already lists is a conflict, whatever its state.
+    assert client.post(url, json={"document_type_id": aadhaar["id"]}).status_code == 409
+
+
+def test_requirement_audit_names_the_requirement(client, service, aadhaar, db_session):
+    """Review L-3."""
+    url = f"{API}/services/{service['id']}/document-requirements"
+    req = client.post(url, json={"document_type_id": aadhaar["id"]}).json()
+    client.patch(f"{url}/{req['id']}", json={"is_required": False})
+    added, updated = db_session.scalars(
+        select(AuditLog.details)
+        .where(AuditLog.action.like("service_requirement_%"))
+        .order_by(AuditLog.id)
+    ).all()
+    assert json.loads(added) == {
+        "requirement_id": req["id"],
+        "document_type": "AADHAAR",
+    }
+    assert json.loads(updated) == {
+        "requirement_id": req["id"],
+        "document_type": "AADHAAR",
+        "fields": ["is_required"],
+    }
+
+
+def test_category_names_unique_ignoring_case(client, category):
+    """Review L-7."""
+    body = {"name": "TRANSPORT", "code": "OTHER"}
+    assert client.post(f"{API}/service-categories", json=body).status_code == 409
+
+
+def test_unstorable_characters_are_rejected(client, category):
+    """Review L-8: a NUL character is a 422, not a server error."""
+    body = {"name": "Bad\u0000Name", "code": "BAD"}
+    response = client.post(f"{API}/service-categories", json=body)
+    assert response.status_code == 422
+    assert "cannot be stored" in response.json()["detail"]
+
+
+def test_concurrent_duplicate_create_is_conflict(test_engine):
+    """Review L-1: the insert race returns 409, not 500."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+
+    from app.models import User
+    from app.schemas.catalogue import DocumentTypeCreate
+    from app.services import catalogue_service
+    from app.services.errors import ConflictError
+
+    with Session(test_engine) as setup:
+        setup.execute(text("TRUNCATE document_types RESTART IDENTITY CASCADE"))
+        setup.commit()
+    first = Session(test_engine, autoflush=False)
+    try:
+        actor = User(id=0, role="admin")
+        data = DocumentTypeCreate(code="RACE", name="Race")
+        # First insert holds the unique key, uncommitted.
+        from app.models import DocumentType
+
+        first.add(DocumentType(code="RACE", name="Race"))
+        first.flush()
+
+        import threading
+
+        result: dict[str, object] = {}
+
+        def second():
+            with Session(test_engine, autoflush=False) as session:
+                # Bypass the pre-check, as a request that passed it just before
+                # the first commit would.
+                from app.repositories import catalogue_repository
+
+                original = catalogue_repository.code_taken
+                catalogue_repository.code_taken = lambda *a, **k: False
+                try:
+                    catalogue_service.create_document_type(session, data, actor)
+                except Exception as exc:  # noqa: BLE001
+                    result["error"] = exc
+                finally:
+                    catalogue_repository.code_taken = original
+
+        thread = threading.Thread(target=second)
+        thread.start()
+        thread.join(timeout=1)
+        first.commit()
+    finally:
+        first.close()
+    thread.join(timeout=10)
+    assert isinstance(result.get("error"), ConflictError), result
+    with Session(test_engine) as cleanup:
+        cleanup.execute(text("TRUNCATE document_types RESTART IDENTITY CASCADE"))
+        cleanup.commit()

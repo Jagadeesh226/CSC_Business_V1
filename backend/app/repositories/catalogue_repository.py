@@ -1,4 +1,4 @@
-from sqlalchemy import Row, select
+from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -27,7 +27,7 @@ def code_taken(db: Session, model, code: str, exclude_id: int | None = None) -> 
 
 
 def name_taken(db: Session, model, name: str, exclude_id: int | None = None) -> bool:
-    stmt = select(model.id).where(model.name == name)
+    stmt = select(model.id).where(func.lower(model.name) == name.lower())
     if exclude_id is not None:
         stmt = stmt.where(model.id != exclude_id)
     return db.scalar(stmt) is not None
@@ -95,8 +95,17 @@ def list_requirements(
         .where(ServiceDocumentRequirement.service_id == service_id)
         .order_by(ServiceDocumentRequirement.sort_order, ServiceDocumentRequirement.id)
     )
-    if active is not None:
-        stmt = stmt.where(ServiceDocumentRequirement.is_active.is_(active))
+    if active:
+        # A retired document type is never an active requirement.
+        stmt = stmt.where(
+            ServiceDocumentRequirement.is_active.is_(True),
+            DocumentType.is_active.is_(True),
+        )
+    elif active is False:
+        stmt = stmt.where(
+            (ServiceDocumentRequirement.is_active.is_(False))
+            | (DocumentType.is_active.is_(False))
+        )
     return list(db.execute(stmt).all())
 
 

@@ -1,4 +1,5 @@
 import math
+import re
 
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,26 @@ def _summary(customer: Customer) -> CustomerSummary:
     )
 
 
+_PHONE_QUERY = re.compile(r"^\+?[0-9 ()-]+$")
+
+
+def _parse_search(search: str | None) -> tuple[str | None, str | None]:
+    """A query made only of phone characters searches phone numbers; anything
+    else searches names. "+91 98765 43210" and "098765 43210" both look for
+    9876543210. A phone search needs at least 4 digits."""
+    search = (search or "").strip()
+    if not search:
+        return None, None
+    if not _PHONE_QUERY.match(search):
+        return search, None
+    d = digits(search)
+    if search.startswith("+") and d.startswith("91"):
+        d = d[2:]
+    elif len(d) == 11 and d.startswith("0"):
+        d = d[1:]
+    return None, d if len(d) >= 4 else None
+
+
 def get_customer(db: Session, customer_id: int) -> CustomerRead:
     customer = repo.get_customer(db, customer_id)
     if customer is None:
@@ -40,13 +61,18 @@ def get_customer(db: Session, customer_id: int) -> CustomerRead:
 def list_customers(
     db: Session, *, page: int, page_size: int, search: str | None = None
 ) -> CustomerListResponse:
-    search = search.strip() if search else None
+    name_query, phone_digits = _parse_search(search)
+    if search and search.strip() and not name_query and not phone_digits:
+        # A phone-style query with fewer than 4 digits matches nothing.
+        return CustomerListResponse(
+            items=[], total=0, page=page, page_size=page_size, total_pages=0
+        )
     customers, total = repo.list_customers(
         db,
         offset=(page - 1) * page_size,
         limit=page_size,
-        search=search or None,
-        search_digits=digits(search),
+        name_query=name_query,
+        phone_digits=phone_digits,
     )
     return CustomerListResponse(
         items=[_summary(c) for c in customers],

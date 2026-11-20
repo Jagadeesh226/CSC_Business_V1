@@ -41,20 +41,33 @@ def _audit(
     entity_id: int,
     actor: User,
     fields: list[str] | None = None,
+    extra: dict | None = None,
 ) -> None:
+    details = dict(extra or {})
+    if fields:
+        details["fields"] = fields
     audit_service.record(
         db,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
         user_id=actor.id,
-        details={"fields": fields} if fields else None,
+        details=details or None,
     )
 
 
 def _commit_unique(db: Session, message: str) -> None:
     try:
         db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError(message) from None
+
+
+def _add_unique(db: Session, obj, message: str):
+    """Insert ``obj``; a concurrent duplicate becomes 409, not 500."""
+    try:
+        return repo.add(db, obj)
     except IntegrityError:
         db.rollback()
         raise ConflictError(message) from None
@@ -79,7 +92,11 @@ def create_category(db: Session, data: CategoryCreate, actor: User) -> CategoryR
         raise ConflictError("A category with this code already exists.")
     if repo.name_taken(db, ServiceCategory, data.name):
         raise ConflictError("A category with this name already exists.")
-    category = repo.add(db, ServiceCategory(**data.model_dump()))
+    category = _add_unique(
+        db,
+        ServiceCategory(**data.model_dump()),
+        "A category with this code or name already exists.",
+    )
     _audit(db, "service_category_created", "service_category", category.id, actor)
     _commit_unique(db, "A category with this code or name already exists.")
     return CategoryRead.model_validate(category)
@@ -155,7 +172,9 @@ def create_service(db: Session, data: ServiceCreate, actor: User) -> ServiceRead
         raise ConflictError("A service with this code already exists.")
     values = data.model_dump()
     values["fee_type"] = data.fee_type.value
-    service = repo.add(db, Service(**values))
+    service = _add_unique(
+        db, Service(**values), "A service with this code already exists."
+    )
     _audit(db, "service_created", "service", service.id, actor)
     _commit_unique(db, "A service with this code already exists.")
     return get_service(db, service.id)
@@ -172,6 +191,15 @@ def update_service(
         _check_category(db, changes["category_id"])
     if "fee_type" in changes:
         changes["fee_type"] = changes["fee_type"].value
+    becomes_active = changes.get("is_active", service.is_active)
+    category = repo.get(
+        db, ServiceCategory, changes.get("category_id", service.category_id)
+    )
+    if becomes_active and (category is None or not category.is_active):
+        raise BusinessRuleError(
+            "A service cannot be active in an inactive category. "
+            "Reactivate the category first."
+        )
     fee_type = changes.get("fee_type", service.fee_type)
     fee = changes.get("default_service_fee", service.default_service_fee)
     if fee_type == FeeType.FIXED.value and fee is None:
@@ -198,7 +226,9 @@ def create_document_type(
     if repo.code_taken(db, DocumentType, data.code):
         raise ConflictError("A document type with this code already exists.")
     values = data.model_dump(mode="json")
-    doc_type = repo.add(db, DocumentType(**values))
+    doc_type = _add_unique(
+        db, DocumentType(**values), "A document type with this code already exists."
+    )
     _audit(db, "document_type_created", "document_type", doc_type.id, actor)
     _commit_unique(db, "A document type with this code already exists.")
     return DocumentTypeRead.model_validate(doc_type)
@@ -256,13 +286,15 @@ def add_requirement(
     doc_type = repo.get(db, DocumentType, data.document_type_id)
     if doc_type is None:
         raise NotFoundError("Document type not found.")
-    if not doc_type.is_active:
-        raise BusinessRuleError("An inactive document type cannot be required.")
     message = "This service already lists this document type."
     if repo.requirement_exists(db, service_id, doc_type.id):
         raise ConflictError(message)
-    req = repo.add(
-        db, ServiceDocumentRequirement(service_id=service_id, **data.model_dump())
+    if not doc_type.is_active:
+        raise BusinessRuleError("An inactive document type cannot be required.")
+    req = _add_unique(
+        db,
+        ServiceDocumentRequirement(service_id=service_id, **data.model_dump()),
+        message,
     )
     _audit(
         db,
@@ -270,9 +302,9 @@ def add_requirement(
         "service",
         service_id,
         actor,
-        [f"document_type:{doc_type.code}"],
+        extra={"requirement_id": req.id, "document_type": doc_type.code},
     )
-    _commit_unique(db, message)
+    db.commit()
     return _requirement_read(req, doc_type)
 
 
@@ -286,8 +318,22 @@ def update_requirement(
     req = repo.get(db, ServiceDocumentRequirement, requirement_id)
     if req is None or req.service_id != service_id:
         raise NotFoundError("Requirement not found.")
-    changed = _apply(req, data.model_dump(exclude_unset=True))
+    doc_type = repo.get(db, DocumentType, req.document_type_id)
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("is_active") and not doc_type.is_active:
+        raise BusinessRuleError(
+            "The document type is inactive. Reactivate it before this requirement."
+        )
+    changed = _apply(req, changes)
     if changed:
-        _audit(db, "service_requirement_updated", "service", service_id, actor, changed)
+        _audit(
+            db,
+            "service_requirement_updated",
+            "service",
+            service_id,
+            actor,
+            changed,
+            extra={"requirement_id": req.id, "document_type": doc_type.code},
+        )
     db.commit()
-    return _requirement_read(req, repo.get(db, DocumentType, req.document_type_id))
+    return _requirement_read(req, doc_type)

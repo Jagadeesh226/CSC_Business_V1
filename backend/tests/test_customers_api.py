@@ -197,3 +197,29 @@ def test_customers_require_sign_in(anon_client):
 def test_customer_write_requires_csrf(client):
     del client.headers["X-CSRF-Token"]
     assert client.post(CUSTOMERS, json=RAVI).status_code == 403
+
+
+# ---------- review fixes ----------
+
+
+@pytest.mark.parametrize(
+    "query", ["+91 98765 43210", "098765 43210", "9876543210", "919876543210", "43210"]
+)
+def test_phone_search_handles_country_code_and_formatting(client, query):
+    """Review L-5."""
+    stored = client.post(
+        CUSTOMERS, json={"name": "Dashes", "phone": "98765-43210"}
+    ).json()["customer"]
+    found = client.get(CUSTOMERS, params={"search": query}).json()["items"]
+    assert [c["id"] for c in found] == [stored["id"]]
+
+
+def test_name_search_does_not_match_phone_digits(client):
+    """Review L-5: 'Ravi 98765' is a name search, not 'any phone with 98765'."""
+    client.post(CUSTOMERS, json={"name": "Someone Else", "phone": "9876500000"})
+    assert client.get(CUSTOMERS, params={"search": "Ravi 98765"}).json()["total"] == 0
+
+
+def test_nul_in_search_is_rejected(client):
+    """Review L-8."""
+    assert client.get(CUSTOMERS, params={"search": "a\u0000b"}).status_code == 422
