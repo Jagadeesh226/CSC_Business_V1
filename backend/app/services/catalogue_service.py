@@ -18,11 +18,11 @@ from app.schemas.catalogue import (
     DocumentTypeRead,
     DocumentTypeRef,
     DocumentTypeUpdate,
-    FeeType,
     RequirementCreate,
     RequirementRead,
     RequirementUpdate,
     ServiceCreate,
+    ServiceFeeType,
     ServiceRead,
     ServiceUpdate,
 )
@@ -202,7 +202,7 @@ def update_service(
         )
     fee_type = changes.get("fee_type", service.fee_type)
     fee = changes.get("default_service_fee", service.default_service_fee)
-    if fee_type == FeeType.FIXED.value and fee is None:
+    if fee_type == ServiceFeeType.FIXED.value and fee is None:
         raise BusinessRuleError("A fixed-fee service needs a default_service_fee.")
     changed = _apply(service, changes)
     if changed:

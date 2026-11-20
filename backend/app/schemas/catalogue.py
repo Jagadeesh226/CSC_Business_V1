@@ -87,7 +87,7 @@ class CategoryRead(BaseModel):
     sort_order: int
 
 
-class FeeType(StrEnum):
+class ServiceFeeType(StrEnum):
     FIXED = "fixed"
     VARIABLE = "variable"
 
@@ -99,14 +99,14 @@ class ServiceCreate(BaseModel):
     name: Name200
     code: Code
     description: Text5000 | None = None
-    fee_type: FeeType = FeeType.FIXED
+    fee_type: ServiceFeeType = ServiceFeeType.FIXED
     default_service_fee: Money | None = None
     requires_vehicle: bool = False
     sort_order: SortOrder = 0
 
     @model_validator(mode="after")
     def fixed_needs_fee(self) -> "ServiceCreate":
-        if self.fee_type == FeeType.FIXED and self.default_service_fee is None:
+        if self.fee_type == ServiceFeeType.FIXED and self.default_service_fee is None:
             raise ValueError("A fixed-fee service needs a default_service_fee.")
         return self
 
@@ -118,7 +118,7 @@ class ServiceUpdate(_NoNulls):
     category_id: ResourceId | None = None
     name: Name200 | None = None
     description: Text5000 | None = None
-    fee_type: FeeType | None = None
+    fee_type: ServiceFeeType | None = None
     default_service_fee: Money | None = None
     requires_vehicle: bool | None = None
     is_active: bool | None = None
@@ -131,7 +131,7 @@ class ServiceRead(BaseModel):
     name: str
     code: str
     description: str | None
-    fee_type: FeeType
+    fee_type: ServiceFeeType
     default_service_fee: Decimal | None
     requires_vehicle: bool
     is_active: bool
