@@ -29,6 +29,10 @@ class JobStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+# Jobs in these statuses are closed: no new assignments, never reopened.
+FINAL_STATUSES = (JobStatus.COMPLETED.value, JobStatus.CANCELLED.value)
+
+
 class JobCreate(BaseModel):
     # Unknown fields (job_number, status, created_by, ...) are rejected with 422.
     model_config = ConfigDict(extra="forbid")
@@ -72,6 +76,13 @@ class ServiceRef(BaseModel):
     code: str
 
 
+class AssigneeRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
 class JobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,6 +97,8 @@ class JobRead(BaseModel):
     customer: CustomerRef
     # Nullable only for legacy rows; jobs created through the API always have one.
     service: ServiceRef | None
+    # People currently assigned to the job.
+    assignees: list[AssigneeRef] = []
 
 
 class JobListResponse(BaseModel):
@@ -94,3 +107,18 @@ class JobListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class AssignmentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: ResourceId
+
+
+class AssignmentRead(BaseModel):
+    id: int
+    user: AssigneeRef
+    assigned_by: AssigneeRef
+    assigned_at: datetime
+    unassigned_by: AssigneeRef | None
+    unassigned_at: datetime | None

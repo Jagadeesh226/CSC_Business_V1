@@ -2,11 +2,15 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
+from fastapi.exceptions import RequestValidationError
 
 from app.core.dependencies import AUTH_RESPONSES, AdminUser, CurrentUser, DbSession
+from app.models import User
 from app.schemas.error import ErrorResponse
 from app.schemas.job import (
     MAX_DB_INT,
+    AssignmentCreate,
+    AssignmentRead,
     JobCreate,
     JobListResponse,
     JobRead,
@@ -15,9 +19,9 @@ from app.schemas.job import (
 )
 from app.services import job_service
 
-# Access (owner decision, until job assignment exists): admins and employees
-# can view and create jobs; only admins can edit them. Once assignments land,
-# employees are limited to their assigned jobs.
+# Access: admins see and edit every job and manage assignments. Employees can
+# create jobs (and are assigned to what they create) and can see and edit only
+# jobs they are assigned to; other jobs return 404. Rules live in job_service.
 router = APIRouter(prefix="/jobs", tags=["jobs"], responses=AUTH_RESPONSES)
 
 JobId = Annotated[int, Path(gt=0, le=MAX_DB_INT)]
@@ -54,7 +58,7 @@ CREATE_422 = {
     },
 )
 def create_job(payload: JobCreate, user: CurrentUser, db: DbSession) -> JobRead:
-    return job_service.create_job(db, payload, created_by=user.id)
+    return job_service.create_job(db, payload, creator=user)
 
 
 @router.get("", response_model=JobListResponse)
@@ -71,9 +75,19 @@ def list_jobs(
     service_id: Annotated[int | None, Query(gt=0, le=MAX_DB_INT)] = None,
     status: JobStatus | None = None,
     due_date: date | None = None,
+    assigned_to: Annotated[
+        str | None,
+        Query(
+            pattern=r"^(me|[1-9][0-9]{0,9})$",
+            description="A user id, or 'me' for the signed-in user",
+        ),
+    ] = None,
 ) -> JobListResponse:
+    assignee_id = _parse_assigned_to(assigned_to, user)
     return job_service.list_jobs(
         db,
+        viewer=user,
+        assigned_to=assignee_id,
         page=page,
         page_size=page_size,
         search=search,
@@ -86,11 +100,91 @@ def list_jobs(
 
 @router.get("/{job_id}", response_model=JobRead, responses=NOT_FOUND)
 def get_job(job_id: JobId, user: CurrentUser, db: DbSession) -> JobRead:
-    return job_service.get_job(db, job_id)
+    return job_service.get_job(db, job_id, viewer=user)
 
 
 @router.patch("/{job_id}", response_model=JobRead, responses=NOT_FOUND)
 def update_job(
-    job_id: JobId, payload: JobUpdate, admin: AdminUser, db: DbSession
+    job_id: JobId, payload: JobUpdate, user: CurrentUser, db: DbSession
 ) -> JobRead:
-    return job_service.update_job(db, job_id, payload, actor_id=admin.id)
+    return job_service.update_job(db, job_id, payload, actor=user)
+
+
+def _parse_assigned_to(value: str | None, user: User) -> int | None:
+    if value is None:
+        return None
+    if value == "me":
+        return user.id
+    user_id = int(value)
+    if user_id > MAX_DB_INT:
+        raise RequestValidationError(
+            [
+                {
+                    "type": "less_than_equal",
+                    "loc": ("query", "assigned_to"),
+                    "msg": f"Input should be less than or equal to {MAX_DB_INT}",
+                    "input": value,
+                }
+            ]
+        )
+    return user_id
+
+
+# ---------- assignments (admin manages; assigned employees can view) ----------
+
+ASSIGN_RESPONSES = {
+    404: {"model": ErrorResponse, "description": "Job or user not found"},
+    409: {"model": ErrorResponse, "description": "User already assigned"},
+    422: {
+        "description": "Validation error, inactive user, or job is closed",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "anyOf": [
+                        {"$ref": "#/components/schemas/HTTPValidationError"},
+                        {"$ref": "#/components/schemas/ErrorResponse"},
+                    ]
+                }
+            }
+        },
+    },
+}
+
+
+@router.get(
+    "/{job_id}/assignments",
+    response_model=list[AssignmentRead],
+    responses=NOT_FOUND,
+)
+def list_assignments(
+    job_id: JobId, user: CurrentUser, db: DbSession
+) -> list[AssignmentRead]:
+    return job_service.list_assignments(db, job_id, viewer=user)
+
+
+@router.post(
+    "/{job_id}/assignments",
+    response_model=JobRead,
+    status_code=status.HTTP_201_CREATED,
+    responses=ASSIGN_RESPONSES,
+)
+def assign_user(
+    job_id: JobId, payload: AssignmentCreate, admin: AdminUser, db: DbSession
+) -> JobRead:
+    return job_service.assign_user(db, job_id, payload.user_id, actor=admin)
+
+
+@router.delete(
+    "/{job_id}/assignments/{user_id}",
+    response_model=JobRead,
+    responses={
+        404: {"model": ErrorResponse, "description": "Job or assignment not found"}
+    },
+)
+def unassign_user(
+    job_id: JobId,
+    user_id: Annotated[int, Path(gt=0, le=MAX_DB_INT)],
+    admin: AdminUser,
+    db: DbSession,
+) -> JobRead:
+    return job_service.unassign_user(db, job_id, user_id, actor=admin)
