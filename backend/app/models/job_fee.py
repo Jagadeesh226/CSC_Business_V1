@@ -39,3 +39,9 @@ class JobFee(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # Fees are never erased: removal marks the row, so totals already used by
+    # payments and receipts can always be traced.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", name="fk_job_fees_deleted_by_users")
+    )
