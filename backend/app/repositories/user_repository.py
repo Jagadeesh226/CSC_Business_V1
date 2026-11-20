@@ -10,6 +10,12 @@ def get_user(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
 
 
+def get_user_for_update(db: Session, user_id: int) -> User | None:
+    """Row-lock the user until the transaction ends (serialises against
+    concurrent deactivation)."""
+    return db.scalar(select(User).where(User.id == user_id).with_for_update())
+
+
 def get_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(func.lower(User.email) == email.lower()))
 

@@ -14,7 +14,7 @@ from app.schemas.user import (
     UserRole,
     UserUpdate,
 )
-from app.services import audit_service
+from app.services import audit_service, job_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 
 EMAIL_TAKEN = "A user with this email already exists."
@@ -185,6 +185,8 @@ def deactivate_user(db: Session, actor: User, user_id: int) -> UserRead:
             entity_id=user.id,
             user_id=actor.id,
         )
+        # Open jobs should not sit with someone who can no longer sign in.
+        job_service.unassign_from_open_jobs(db, user.id, actor)
         db.commit()
     return UserRead.model_validate(user)
 

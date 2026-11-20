@@ -306,6 +306,7 @@ def test_get_job(client, customer, service):
         "created_at",
         "customer",
         "service",
+        "assignees",
     }
     assert body["customer"] == {
         "id": customer.id,
@@ -461,21 +462,53 @@ def test_jobs_require_sign_in(anon_client, job):
     assert response.status_code == 401
 
 
-def test_employee_can_view_and_create_jobs(
-    employee_client, employee_user, customer, service, job
+def test_employee_creating_a_job_is_assigned_to_it(
+    employee_client, employee_user, customer, service
 ):
-    assert employee_client.get("/api/v1/jobs").json()["total"] >= 1
-    assert employee_client.get(f"/api/v1/jobs/{job['id']}").status_code == 200
-
     response = create(employee_client, customer, service, title="By employee")
+
     assert response.status_code == 201
-    assert response.json()["created_by"] == employee_user.id
+    body = response.json()
+    assert body["created_by"] == employee_user.id
+    assert body["assignees"] == [{"id": employee_user.id, "name": employee_user.name}]
+    assert employee_client.get(f"/api/v1/jobs/{body['id']}").status_code == 200
 
 
-def test_employee_cannot_edit_jobs(employee_client, job):
+def test_admin_creating_a_job_is_not_auto_assigned(client, customer, service):
+    assert create(client, customer, service).json()["assignees"] == []
+
+
+def test_employee_does_not_see_unassigned_jobs(employee_client, job):
+    assert employee_client.get("/api/v1/jobs").json()["total"] == 0
+    response = employee_client.get(f"/api/v1/jobs/{job['id']}")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Job not found."}
+
+
+def test_employee_cannot_edit_unassigned_jobs(employee_client, job):
     response = employee_client.patch(f"/api/v1/jobs/{job['id']}", json={"title": "X"})
-    assert response.status_code == 403
-    assert response.json() == {"detail": "Admin access required."}
+    assert response.status_code == 404
+
+
+def test_employee_can_edit_assigned_jobs(
+    client, employee_client, employee_user, job, db_session
+):
+    client.post(
+        f"/api/v1/jobs/{job['id']}/assignments", json={"user_id": employee_user.id}
+    )
+
+    response = employee_client.patch(
+        f"/api/v1/jobs/{job['id']}", json={"title": "Edited by employee"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "Edited by employee"
+    entry = db_session.scalar(
+        select(AuditLog)
+        .where(AuditLog.action == "job_updated", AuditLog.entity_id == job["id"])
+        .order_by(AuditLog.id.desc())
+    )
+    assert entry.user_id == employee_user.id
 
 
 def test_job_write_requires_csrf(client, customer, service):
