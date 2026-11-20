@@ -23,7 +23,7 @@ from app.schemas.job import (
     StatusHistoryRead,
 )
 from app.schemas.user import UserRole
-from app.services import audit_service
+from app.services import audit_service, fee_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 
 JOB_NUMBER_SEQUENCE = "job_number"
@@ -43,13 +43,13 @@ def format_job_number(year: int, value: int) -> str:
     return f"{JOB_NUMBER_PREFIX}-{year}-{value:06d}"
 
 
-def _is_admin(user: User | None) -> bool:
+def is_admin(user: User | None) -> bool:
     return user is not None and user.role == UserRole.ADMIN.value
 
 
-def _ensure_job_access(db: Session, job_id: int, viewer: User | None) -> None:
+def ensure_job_access(db: Session, job_id: int, viewer: User | None) -> None:
     """Raise 404 unless ``viewer`` may access the job (None = internal call)."""
-    if viewer is None or _is_admin(viewer):
+    if viewer is None or is_admin(viewer):
         return
     if not repo.is_actively_assigned(db, job_id, viewer.id):
         raise NotFoundError(JOB_NOT_FOUND)
@@ -77,7 +77,7 @@ def get_job(db: Session, job_id: int, viewer: User | None = None) -> JobRead:
     row = repo.get_job_with_relations(db, job_id)
     if row is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    _ensure_job_access(db, job_id, viewer)
+    ensure_job_access(db, job_id, viewer)
     return _to_read(row, repo.active_assignees(db, [job_id])[job_id])
 
 
@@ -141,7 +141,8 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
                 user_id=created_by,
                 details={"job_number": job.job_number},
             )
-            if creator is not None and not _is_admin(creator):
+            fee_service.add_default_service_fee(db, job.id, service, created_by)
+            if creator is not None and not is_admin(creator):
                 _assign(db, job.id, creator, actor=creator, reason="creator")
             db.commit()
             return get_job(db, job.id)
@@ -175,7 +176,7 @@ def list_jobs(
         status=status.value if status is not None else None,
         due_date=due_date,
         assigned_to=assigned_to,
-        visible_to=None if viewer is None or _is_admin(viewer) else viewer.id,
+        visible_to=None if viewer is None or is_admin(viewer) else viewer.id,
     )
     assignees = repo.active_assignees(db, [row[0].id for row in rows])
     return JobListResponse(
@@ -193,9 +194,9 @@ def update_job(
     job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    _ensure_job_access(db, job_id, actor)
+    ensure_job_access(db, job_id, actor)
     # Closed jobs are read-only for employees; admins can still correct them.
-    if job.status in FINAL_STATUSES and actor is not None and not _is_admin(actor):
+    if job.status in FINAL_STATUSES and actor is not None and not is_admin(actor):
         raise BusinessRuleError(f"A {job.status} job cannot be edited.")
 
     changed = {
@@ -299,7 +300,7 @@ def list_assignments(
 ) -> list[AssignmentRead]:
     if repo.get_job(db, job_id) is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    _ensure_job_access(db, job_id, viewer)
+    ensure_job_access(db, job_id, viewer)
     return [
         AssignmentRead(
             id=assignment.id,
@@ -385,7 +386,7 @@ def change_status(
     job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    _ensure_job_access(db, job_id, actor)
+    ensure_job_access(db, job_id, actor)
     if new_status == JobStatus.CANCELLED:
         raise BusinessRuleError("Use the cancel action to cancel a job.")
     allowed = STATUS_TRANSITIONS.get(job.status, ())
@@ -416,7 +417,7 @@ def list_status_history(
 ) -> list[StatusHistoryRead]:
     if repo.get_job(db, job_id) is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    _ensure_job_access(db, job_id, viewer)
+    ensure_job_access(db, job_id, viewer)
     return [
         StatusHistoryRead(
             id=entry.id,

@@ -522,7 +522,11 @@ def test_job_changes_are_audited(client, admin_user, db_session, job):
 
     entries = db_session.scalars(
         select(AuditLog)
-        .where(AuditLog.entity_type == "job", AuditLog.entity_id == job["id"])
+        .where(
+            AuditLog.entity_type == "job",
+            AuditLog.entity_id == job["id"],
+            AuditLog.action.like("job_%"),
+        )
         .order_by(AuditLog.id)
     ).all()
     assert [e.action for e in entries] == ["job_created", "job_updated"]
@@ -533,6 +537,8 @@ def test_job_changes_are_audited(client, admin_user, db_session, job):
 def test_unchanged_patch_writes_no_audit(client, db_session, job):
     client.patch(f"/api/v1/jobs/{job['id']}", json={"title": job["title"]})
     actions = db_session.scalars(
-        select(AuditLog.action).where(AuditLog.entity_id == job["id"])
+        select(AuditLog.action).where(
+            AuditLog.entity_id == job["id"], AuditLog.action.like("job_%")
+        )
     ).all()
     assert actions == ["job_created"]
