@@ -20,7 +20,7 @@ from app.models import (
 from app.schemas.fee import FeeCreate, FeeType
 from app.schemas.job import JobCreate
 from app.services import fee_service, job_service
-from app.services.errors import BusinessRuleError
+from app.services.errors import BusinessRuleError, NotFoundError
 
 JOBS = "/api/v1/jobs"
 FEE = {"fee_type": "third_party", "description": "Stamp paper", "amount": "50.00"}
@@ -415,3 +415,137 @@ def test_employee_fee_waits_for_payment_being_recorded(test_engine, committed_jo
     assert isinstance(result.get("error"), BusinessRuleError), result
     with Session(test_engine) as session:
         assert session.scalars(select(JobFee)).all() == []
+
+
+# ---------- review fixes ----------
+
+
+@pytest.mark.parametrize(
+    "given, stored", [("1E+2", "100.00"), ("100.5", "100.50"), ("5.000", "5.00")]
+)
+def test_amounts_are_normalised_everywhere(client, job, db_session, given, stored):
+    """Review L-1: the API, database and audit log show the same amount."""
+    fee = add(client, job["id"], amount=given).json()
+    assert fee["amount"] == stored
+    entry = db_session.scalar(
+        select(AuditLog)
+        .where(AuditLog.action == "fee_added")
+        .order_by(AuditLog.id.desc())
+    )
+    assert json.loads(entry.details)["amount"] == stored
+
+    client.patch(f"{fees_url(job['id'])}/{fee['id']}", json={"amount": "2E+1"})
+    update = db_session.scalar(select(AuditLog).where(AuditLog.action == "fee_updated"))
+    assert json.loads(update.details)["changes"]["amount"] == {
+        "old": stored,
+        "new": "20.00",
+    }
+
+
+def test_zero_default_fee_is_not_added(client, customer, make_service, db_session):
+    """Review L-2: a fixed service with a 0.00 default adds no fee."""
+    service = make_service()
+    service.default_service_fee = Decimal("0.00")
+    db_session.flush()
+    job = client.post(
+        JOBS,
+        json={"customer_id": customer.id, "service_id": service.id, "title": "J"},
+    ).json()
+    assert client.get(fees_url(job["id"])).json()["items"] == []
+
+
+def test_automatic_fee_is_audited(
+    client, admin_user, customer, make_service, db_session
+):
+    """Review L-4."""
+    service = make_service()  # fixed 100.00
+    job = client.post(
+        JOBS,
+        json={"customer_id": customer.id, "service_id": service.id, "title": "J"},
+    ).json()
+    entry = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "fee_added", AuditLog.entity_id == job["id"]
+        )
+    )
+    details = json.loads(entry.details)
+    assert details["reason"] == "service_default"
+    assert details["amount"] == "100.00"
+    assert details["fee_type"] == "service"
+    assert entry.user_id == admin_user.id
+
+
+def test_fee_removal_is_audited(client, admin_user, job, db_session):
+    """Review L-4."""
+    fee = add(client, job["id"]).json()
+    client.delete(f"{fees_url(job['id'])}/{fee['id']}")
+    entry = db_session.scalar(select(AuditLog).where(AuditLog.action == "fee_removed"))
+    assert entry.user_id == admin_user.id
+    assert entry.entity_id == job["id"]
+    assert json.loads(entry.details) == {
+        "fee_id": fee["id"],
+        "fee_type": "third_party",
+        "amount": "50.00",
+    }
+
+
+def test_unassigned_employee_loses_fee_access(
+    client, employee_client, employee_user, job
+):
+    """Review L-4: a formerly assigned employee gets 404."""
+    assign(client, job["id"], employee_user.id)
+    assert employee_client.get(fees_url(job["id"])).status_code == 200
+    client.delete(f"{JOBS}/{job['id']}/assignments/{employee_user.id}")
+    assert employee_client.get(fees_url(job["id"])).status_code == 404
+    assert add(employee_client, job["id"]).status_code == 404
+
+
+def test_concurrent_removal_is_recorded_once(test_engine, committed_job):
+    """Review L-4: two admins removing the same fee: one succeeds, one 404."""
+    job_id, admin_id, _ = committed_job
+    with Session(test_engine, autoflush=False) as session:
+        admin = session.get(User, admin_id)
+        fee = fee_service.add_fee(
+            session,
+            job_id,
+            FeeCreate(
+                fee_type=FeeType.DEPARTMENT, description="RTO", amount=Decimal(1)
+            ),
+            actor=admin,
+        )
+
+    first = Session(test_engine, autoflush=False)
+    try:
+        first_admin = first.get(User, admin_id)
+        real_commit = first.commit
+        first.commit = lambda: None  # pause before commit, keeping the lock
+        fee_service.remove_fee(first, job_id, fee.id, actor=first_admin)
+        first.commit = real_commit
+
+        result: dict[str, object] = {}
+
+        def second_removal():
+            with Session(test_engine, autoflush=False) as session:
+                admin = session.get(User, admin_id)
+                try:
+                    fee_service.remove_fee(session, job_id, fee.id, actor=admin)
+                    result["value"] = "removed"
+                except Exception as exc:  # noqa: BLE001
+                    result["error"] = exc
+
+        thread = threading.Thread(target=second_removal)
+        thread.start()
+        thread.join(timeout=1)
+        blocked = thread.is_alive()
+        first.commit()
+    finally:
+        first.close()
+    thread.join(timeout=10)
+
+    assert blocked, f"expected to wait on the job lock, got {result}"
+    assert isinstance(result.get("error"), NotFoundError), result
+    with Session(test_engine) as session:
+        removals = session.scalars(
+            select(AuditLog).where(AuditLog.action == "fee_removed")
+        ).all()
+    assert len(removals) == 1

@@ -3,7 +3,14 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from app.schemas.job import AssigneeRef
 
@@ -17,7 +24,13 @@ class FeeType(StrEnum):
 
 
 # Matches job_fees.amount NUMERIC(12, 2); fees are positive amounts in rupees.
-Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
+# Normalised to exactly two decimal places ("1E+2" -> 100.00), so the API,
+# the database and the audit log all show the same value.
+Amount = Annotated[
+    Decimal,
+    Field(gt=0, max_digits=12, decimal_places=2),
+    AfterValidator(lambda v: v.quantize(Decimal("0.01"))),
+]
 FeeDescription = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
 ]

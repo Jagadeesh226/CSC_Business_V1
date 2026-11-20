@@ -32,6 +32,10 @@ from app.services.errors import BusinessRuleError, NotFoundError
 FEE_NOT_FOUND = "Fee not found."
 
 
+def _audit_value(value: object) -> str:
+    return f"{value:.2f}" if isinstance(value, Decimal) else str(value)
+
+
 def _locked_job(db: Session, job_id: int, actor: User):
     job = job_repository.get_job_for_update(db, job_id)
     if job is None:
@@ -114,7 +118,7 @@ def _add(
     details: dict[str, object] = {
         "fee_id": fee.id,
         "fee_type": fee.fee_type,
-        "amount": str(fee.amount),
+        "amount": _audit_value(fee.amount),
     }
     if reason:
         details["reason"] = reason
@@ -134,13 +138,15 @@ def add_default_service_fee(
 ) -> None:
     """On job creation: a fixed-fee service starts the job with its default
     service fee (caller commits). Variable-fee services add none."""
-    if service.fee_type == "fixed" and service.default_service_fee is not None:
+    default = service.default_service_fee
+    # A zero default means "no charge": fees are always positive amounts.
+    if service.fee_type == "fixed" and default is not None and default > 0:
         _add(
             db,
             job_id,
             FeeType.SERVICE,
             service.name,
-            service.default_service_fee,
+            default,
             actor_id,
             reason="service_default",
         )
@@ -168,7 +174,7 @@ def update_fee(
             details={
                 "fee_id": fee.id,
                 "changes": {
-                    k: {"old": str(getattr(fee, k)), "new": str(v)}
+                    k: {"old": _audit_value(getattr(fee, k)), "new": _audit_value(v)}
                     for k, v in changed.items()
                 },
             },
@@ -196,7 +202,7 @@ def remove_fee(db: Session, job_id: int, fee_id: int, actor: User) -> None:
         details={
             "fee_id": fee.id,
             "fee_type": fee.fee_type,
-            "amount": str(fee.amount),
+            "amount": _audit_value(fee.amount),
         },
     )
     db.commit()

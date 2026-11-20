@@ -31,7 +31,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
+    """Downgrade schema.
+
+    Refuses while removed fees exist: dropping the columns would make them
+    count as active fees again and silently change job totals.
+    """
+    removed = (
+        op.get_bind()
+        .execute(sa.text("SELECT count(*) FROM job_fees WHERE deleted_at IS NOT NULL"))
+        .scalar()
+    )
+    if removed:
+        raise RuntimeError(
+            f"{removed} removed job fee(s) exist; downgrading would count them "
+            "again. Resolve them before downgrading."
+        )
     op.drop_constraint("fk_job_fees_deleted_by_users", "job_fees", type_="foreignkey")
     op.drop_column("job_fees", "deleted_by")
     op.drop_column("job_fees", "deleted_at")
