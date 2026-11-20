@@ -278,25 +278,42 @@ def list_assignments(db: Session, job_id: int) -> list[AssignmentRow]:
     )
 
 
-def unassign_from_open_jobs(
-    db: Session,
-    user_id: int,
-    actor_id: int,
-    now: datetime,
-    final_statuses: tuple[str, ...],
+def lock_open_jobs_assigned_to(
+    db: Session, user_id: int, final_statuses: tuple[str, ...]
 ) -> list[int]:
-    """End the user's active assignments on jobs that are not final.
+    """Row-lock the open jobs the user is actively assigned to, in id order.
 
-    Returns the affected job ids.
+    A job being closed concurrently is waited for and then re-checked, so it
+    is skipped once it is completed or cancelled.
     """
-    open_job_ids = select(Job.id).where(Job.status.not_in(final_statuses))
+    return list(
+        db.scalars(
+            select(Job.id)
+            .join(JobAssignment, JobAssignment.job_id == Job.id)
+            .where(
+                JobAssignment.user_id == user_id,
+                JobAssignment.unassigned_at.is_(None),
+                Job.status.not_in(final_statuses),
+            )
+            .order_by(Job.id)
+            .with_for_update(of=Job)
+        )
+    )
+
+
+def end_assignments_on_jobs(
+    db: Session, user_id: int, job_ids: list[int], actor_id: int, now: datetime
+) -> list[int]:
+    """End the user's active assignments on the given (locked) jobs."""
+    if not job_ids:
+        return []
     return list(
         db.scalars(
             update(JobAssignment)
             .where(
                 JobAssignment.user_id == user_id,
                 JobAssignment.unassigned_at.is_(None),
-                JobAssignment.job_id.in_(open_job_ids),
+                JobAssignment.job_id.in_(job_ids),
             )
             .values(unassigned_at=now, unassigned_by=actor_id)
             .returning(JobAssignment.job_id)
@@ -320,6 +337,6 @@ def list_status_history(
             select(JobStatusHistory, User)
             .outerjoin(User, JobStatusHistory.changed_by == User.id)
             .where(JobStatusHistory.job_id == job_id)
-            .order_by(JobStatusHistory.changed_at, JobStatusHistory.id)
+            .order_by(JobStatusHistory.id)  # ids follow the job lock; times may not
         ).all()
     )

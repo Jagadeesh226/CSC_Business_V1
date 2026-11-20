@@ -247,8 +247,9 @@ def assign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRead:
     job = repo.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(JOB_NOT_FOUND)
-    # Locked so a concurrent deactivation cannot slip between this check and
-    # the insert (it would miss the not-yet-committed assignment).
+    # Lock order everywhere: the job row (taken above), then the user row.
+    # Locking the user means a concurrent deactivation cannot slip between
+    # this check and the insert.
     user = user_repository.get_user_for_update(db, user_id)
     if user is None:
         raise NotFoundError("User not found.")
@@ -312,10 +313,19 @@ def list_assignments(
     ]
 
 
-def unassign_from_open_jobs(db: Session, user_id: int, actor: User) -> None:
-    """Remove a deactivated user from every open job (caller commits)."""
-    for job_id in repo.unassign_from_open_jobs(
-        db, user_id, actor.id, datetime.now(UTC), FINAL_STATUSES
+def lock_open_jobs_of(db: Session, user_id: int) -> list[int]:
+    """First step of deactivation: lock the user's open jobs (job rows are
+    always locked before user rows)."""
+    return repo.lock_open_jobs_assigned_to(db, user_id, FINAL_STATUSES)
+
+
+def unassign_from_jobs(
+    db: Session, user_id: int, job_ids: list[int], actor: User
+) -> None:
+    """Remove a deactivated user from the given locked open jobs (caller
+    commits)."""
+    for job_id in repo.end_assignments_on_jobs(
+        db, user_id, job_ids, actor.id, datetime.now(UTC)
     ):
         audit_service.record(
             db,

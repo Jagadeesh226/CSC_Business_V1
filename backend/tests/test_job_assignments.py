@@ -20,7 +20,7 @@ from app.models import (
 from app.repositories import job_repository
 from app.schemas.job import JobCreate
 from app.services import job_service
-from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.services.errors import ConflictError, NotFoundError
 
 JOBS = "/api/v1/jobs"
 
@@ -418,23 +418,8 @@ def _run_while_locked(holder: Session, target):
     return result
 
 
-def test_assign_waits_for_concurrent_deactivation(test_engine, committed_job):
-    """Review M-1: a deactivation in flight must not miss a new assignment."""
-    job_id, admin_id, employee_id = committed_job
-    deactivator = Session(test_engine)
-    deactivator.get(User, employee_id).is_active = False
-    deactivator.flush()  # row-locks the user, not yet committed
-
-    def assign_in_other_session():
-        with Session(test_engine) as session:
-            admin = session.get(User, admin_id)
-            return job_service.assign_user(session, job_id, employee_id, actor=admin)
-
-    result = _run_while_locked(deactivator, assign_in_other_session)
-
-    assert isinstance(result.get("error"), BusinessRuleError), result
-    with Session(test_engine) as session:
-        assert session.scalars(select(JobAssignment)).all() == []
+# The deactivation-vs-assignment race (review M-1) is covered with the real
+# deactivate_user in tests/test_job_status.py.
 
 
 def test_concurrent_unassign_is_recorded_once(test_engine, committed_job):

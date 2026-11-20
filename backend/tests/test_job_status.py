@@ -18,8 +18,8 @@ from app.models import (
     ServiceCategory,
     User,
 )
-from app.schemas.job import JobCreate, JobStatus
-from app.services import job_service
+from app.schemas.job import JobCreate, JobStatus, JobUpdate
+from app.services import job_service, user_service
 from app.services.errors import BusinessRuleError
 
 JOBS = "/api/v1/jobs"
@@ -425,3 +425,146 @@ def test_assign_waits_for_job_being_closed(test_engine, committed_job):
     assert isinstance(result.get("error"), BusinessRuleError), result
     with Session(test_engine) as session:
         assert session.scalars(select(JobAssignment)).all() == []
+
+
+# ---------- races through the real service functions ----------
+# Each "holder" runs a real service call in an app-like session
+# (autoflush=False), paused just before its commit so it keeps its locks.
+
+
+def _paused(test_engine, call, *, flush: bool = True):
+    """Run ``call(session)`` with its commit deferred; return the open session.
+
+    ``flush=False`` pauses exactly where the real commit would start, before
+    anything pending is written. That is the window review M-1 found: with
+    autoflush off, a deactivation that only *sets* is_active holds no lock on
+    the user until commit. Use ``flush=True`` when the call needs its earlier
+    writes visible to later steps (several status moves in one transaction).
+    """
+    session = Session(test_engine, autoflush=False)
+    real_commit = session.commit
+    session.commit = session.flush if flush else (lambda: None)
+    try:
+        call(session)
+    except BaseException:
+        session.close()
+        raise
+    session.commit = real_commit
+    return session
+
+
+def _assign_committed(test_engine, job_id, admin_id, user_id):
+    with Session(test_engine, autoflush=False) as session:
+        admin = session.get(User, admin_id)
+        job_service.assign_user(session, job_id, user_id, actor=admin)
+
+
+def _move_to_completed(session, job_id, admin_id):
+    admin = session.get(User, admin_id)
+    for status in ("in_progress", "submitted", "completed"):
+        job_service.change_status(session, job_id, JobStatus(status), actor=admin)
+
+
+def test_assign_waits_for_real_deactivation(test_engine, committed_job):
+    """Review M-1 (both rounds): assignment during deactivation is refused."""
+    job_id, admin_id, employee_id = committed_job
+    holder = _paused(
+        test_engine,
+        lambda s: user_service.deactivate_user(s, s.get(User, admin_id), employee_id),
+        flush=False,
+    )
+
+    def assign():
+        with Session(test_engine, autoflush=False) as session:
+            admin = session.get(User, admin_id)
+            return job_service.assign_user(session, job_id, employee_id, actor=admin)
+
+    result = _run_while_locked(holder, assign)
+
+    assert isinstance(result.get("error"), BusinessRuleError), result
+    with Session(test_engine) as session:
+        assert session.scalars(select(JobAssignment)).all() == []
+
+
+def test_deactivation_waits_for_job_being_completed(test_engine, committed_job):
+    """Review M-2: a job completed meanwhile keeps its assignee."""
+    job_id, admin_id, employee_id = committed_job
+    _assign_committed(test_engine, job_id, admin_id, employee_id)
+    holder = _paused(test_engine, lambda s: _move_to_completed(s, job_id, admin_id))
+
+    def deactivate():
+        with Session(test_engine, autoflush=False) as session:
+            admin = session.get(User, admin_id)
+            return user_service.deactivate_user(session, admin, employee_id)
+
+    result = _run_while_locked(holder, deactivate)
+
+    assert "error" not in result, result
+    with Session(test_engine) as session:
+        assert session.get(Job, job_id).status == "completed"
+        active = session.scalars(
+            select(JobAssignment).where(JobAssignment.unassigned_at.is_(None))
+        ).all()
+        assert [a.user_id for a in active] == [employee_id]
+        assert session.get(User, employee_id).is_active is False
+        removals = session.scalars(
+            select(AuditLog).where(AuditLog.action == "job_unassigned")
+        ).all()
+        assert removals == []
+
+
+def test_employee_edit_waits_for_job_being_completed(test_engine, committed_job):
+    """Review L-2: an edit racing completion sees the closed job."""
+    job_id, admin_id, employee_id = committed_job
+    _assign_committed(test_engine, job_id, admin_id, employee_id)
+    holder = _paused(test_engine, lambda s: _move_to_completed(s, job_id, admin_id))
+
+    def edit():
+        with Session(test_engine, autoflush=False) as session:
+            employee = session.get(User, employee_id)
+            return job_service.update_job(
+                session, job_id, JobUpdate(title="Late edit"), actor=employee
+            )
+
+    result = _run_while_locked(holder, edit)
+
+    assert isinstance(result.get("error"), BusinessRuleError), result
+    with Session(test_engine) as session:
+        assert session.get(Job, job_id).title == "T"
+
+
+def test_unassign_waits_for_job_being_completed(test_engine, committed_job):
+    """Review L-2: a removal racing completion is refused."""
+    job_id, admin_id, employee_id = committed_job
+    _assign_committed(test_engine, job_id, admin_id, employee_id)
+    holder = _paused(test_engine, lambda s: _move_to_completed(s, job_id, admin_id))
+
+    def unassign():
+        with Session(test_engine, autoflush=False) as session:
+            admin = session.get(User, admin_id)
+            return job_service.unassign_user(session, job_id, employee_id, actor=admin)
+
+    result = _run_while_locked(holder, unassign)
+
+    assert isinstance(result.get("error"), BusinessRuleError), result
+
+
+def test_status_history_follows_lock_order_not_start_time(test_engine, committed_job):
+    """Review L-1: a transaction that started earlier but changed the job
+    later is listed after the earlier change."""
+    job_id, admin_id, _ = committed_job
+    early = Session(test_engine, autoflush=False)
+    try:
+        early.execute(text("SELECT 1"))  # starts the transaction (fixes now())
+        early_admin = early.get(User, admin_id)
+        with Session(test_engine, autoflush=False) as late:
+            job_service.change_status(
+                late, job_id, JobStatus.IN_PROGRESS, actor=late.get(User, admin_id)
+            )
+        job_service.change_status(early, job_id, JobStatus.SUBMITTED, actor=early_admin)
+    finally:
+        early.close()
+
+    with Session(test_engine) as session:
+        history = job_service.list_status_history(session, job_id)
+    assert [h.new_status for h in history] == ["pending", "in_progress", "submitted"]
