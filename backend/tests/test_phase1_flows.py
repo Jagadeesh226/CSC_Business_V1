@@ -2,17 +2,15 @@
 
 Each test drives one realistic story end to end through the HTTP API, as the
 frontend will: sign-in, users, jobs, assignment, status, fees and the audit
-trail together. Payments are Phase 3, so a received payment is inserted
-directly where a flow needs one.
+trail together (payments, from Phase 3, through the API as well).
 """
 
 import json
-from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
 
-from app.models import AuditLog, Payment
+from app.models import AuditLog
 
 API = "/api/v1"
 TEMP_PASSWORD = "temporary-pass-1"
@@ -119,9 +117,13 @@ def test_job_from_creation_to_completion(
         "total": "610.50",
     }
 
-    # 4. The customer pays (Phase 3 will record this through the API).
-    db_session.add(Payment(job_id=job_id, amount=Decimal("610.50"), status="received"))
-    db_session.flush()
+    # 4. The customer pays the full amount.
+    paid = employee.post(
+        f"{API}/jobs/{job_id}/payments",
+        json={"amount": "610.50", "method": "cash"},
+        headers={"Idempotency-Key": "phase1-flow-payment"},
+    )
+    assert paid.status_code == 201, paid.text
     late_fee = employee.post(
         f"{API}/jobs/{job_id}/fees",
         json={"fee_type": "third_party", "description": "Late", "amount": "10"},
@@ -168,6 +170,7 @@ def test_job_from_creation_to_completion(
         "fee_added",
         "job_status_changed",
         "job_updated",
+        "payment_recorded",
         "job_status_changed",
         "job_status_changed",
     ]
