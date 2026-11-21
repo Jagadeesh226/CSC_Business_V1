@@ -99,13 +99,10 @@ class LocalEncryptedStorage:
         return self._aead.decrypt(nonce, ciphertext, storage_key.encode())
 
 
-def get_storage() -> Storage:
-    root = os.getenv("DOCUMENT_STORAGE_DIR")
+def _load_key() -> bytes:
     key_b64 = os.getenv("DOCUMENT_ENCRYPTION_KEY")
-    if not root or not key_b64:
-        raise StorageNotConfigured(
-            "DOCUMENT_STORAGE_DIR and DOCUMENT_ENCRYPTION_KEY must be set."
-        )
+    if not key_b64:
+        raise StorageNotConfigured("DOCUMENT_ENCRYPTION_KEY must be set.")
     try:
         key = base64.b64decode(key_b64, altchars=b"-_", validate=True)
     except (ValueError, TypeError):
@@ -114,4 +111,34 @@ def get_storage() -> Storage:
         ) from None
     if len(key) != 32:
         raise StorageNotConfigured("DOCUMENT_ENCRYPTION_KEY must be 32 bytes.")
-    return LocalEncryptedStorage(Path(root), key)
+    return key
+
+
+def get_storage() -> Storage:
+    root = os.getenv("DOCUMENT_STORAGE_DIR")
+    if not root:
+        raise StorageNotConfigured("DOCUMENT_STORAGE_DIR must be set.")
+    return LocalEncryptedStorage(Path(root), _load_key())
+
+
+def seal(data: bytes, context: str) -> bytes:
+    """Encrypt a small value for a database column (e.g. OCR results).
+
+    ``context`` names what the value belongs to and is bound as associated
+    data, so a sealed value cannot be moved to another row unnoticed.
+    """
+    nonce = secrets.token_bytes(NONCE_BYTES)
+    return (
+        FORMAT_PREFIX
+        + nonce
+        + AESGCM(_load_key()).encrypt(nonce, data, context.encode())
+    )
+
+
+def unseal(blob: bytes, context: str) -> bytes:
+    if not blob.startswith(FORMAT_PREFIX):
+        raise ValueError("Unknown sealed value format.")
+    body = blob[len(FORMAT_PREFIX) :]
+    return AESGCM(_load_key()).decrypt(
+        body[:NONCE_BYTES], body[NONCE_BYTES:], context.encode()
+    )

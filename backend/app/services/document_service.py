@@ -15,6 +15,7 @@ change is audited; audit details never contain file contents or OCR values.
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.storage import get_storage
@@ -41,7 +42,7 @@ from app.schemas.document import (
     DocumentVersionRead,
 )
 from app.schemas.job import FINAL_STATUSES, AssigneeRef
-from app.services import audit_service, job_service
+from app.services import audit_service, job_service, task_queue
 from app.services.errors import (
     BusinessRuleError,
     ConflictError,
@@ -98,21 +99,21 @@ def _deny(db: Session, document: Document | None, user: User) -> None:
     raise NotFoundError(DOCUMENT_NOT_FOUND)
 
 
-def _get_accessible(db: Session, document_id: int, user: User) -> Document:
+def get_accessible(db: Session, document_id: int, user: User) -> Document:
     document = repo.get_document(db, document_id)
     if document is None or not can_access(db, document, user):
         _deny(db, document, user)
     return document
 
 
-def _lock_for_write(db: Session, document_id: int, user: User):
+def lock_for_write(db: Session, document_id: int, user: User):
     """Lock the document's jobs then the document; check read access.
 
     If the document gained or lost a job link between reading the links and
     locking it, the caller is asked to retry, so the closed-job and submit
     checks always see every job the document belongs to.
     """
-    document = _get_accessible(db, document_id, user)
+    document = get_accessible(db, document_id, user)
     job_ids = repo.linked_job_ids(db, document.id)
     jobs = repo.lock_jobs(db, job_ids)
     document = repo.lock_document(db, document_id)
@@ -121,7 +122,7 @@ def _lock_for_write(db: Session, document_id: int, user: User):
     return document, jobs
 
 
-def _ensure_can_review(db: Session, document: Document, user: User) -> None:
+def ensure_can_review(db: Session, document: Document, user: User) -> None:
     if job_service.is_admin(user):
         return
     if not repo.assigned_to_linked_job(db, user.id, document.id):
@@ -131,7 +132,7 @@ def _ensure_can_review(db: Session, document: Document, user: User) -> None:
         )
 
 
-def _ensure_no_closed_job(jobs: list[Job], user: User, action: str) -> None:
+def ensure_no_closed_job(jobs: list[Job], user: User, action: str) -> None:
     """Documents of completed/cancelled jobs are a record; employees cannot
     change them (admins can, to correct mistakes)."""
     if job_service.is_admin(user):
@@ -191,9 +192,13 @@ def _reads(db: Session, docs: list[Document]) -> list[DocumentRead]:
 
 
 def get_document(db: Session, document_id: int, viewer: User) -> DocumentDetail:
-    document = _get_accessible(db, document_id, viewer)
+    document = get_accessible(db, document_id, viewer)
     _audit(db, "document_viewed", document.id, viewer)
     db.commit()
+    return _detail(db, document)
+
+
+def get_detail(db: Session, document: Document) -> DocumentDetail:
     return _detail(db, document)
 
 
@@ -248,7 +253,7 @@ def read_file(
     db: Session, document_id: int, viewer: User, version: int | None, inline: bool
 ) -> tuple[DocumentVersion, bytes]:
     """Decrypt a version for preview/download; always audited."""
-    document = _get_accessible(db, document_id, viewer)
+    document = get_accessible(db, document_id, viewer)
     number = version or document.current_version
     stored = repo.get_version(db, document.id, number)
     if stored is None:
@@ -345,7 +350,7 @@ def upload(
         job_service.ensure_job_access(db, job.id, actor)
         if job.customer_id != customer_id:
             raise BusinessRuleError("That job belongs to another customer.")
-        _ensure_no_closed_job([job], actor, "add")
+        ensure_no_closed_job([job], actor, "add")
         if checklist_item_id is not None:
             item = repo.get_checklist_item(db, checklist_item_id)
             if item is None or item.job_id != job.id:
@@ -416,20 +421,40 @@ def upload(
         content_type=file.content_type,
         size_bytes=file.size_bytes,
     )
+    _queue_ocr(db, document, actor)
     _commit_or_discard(db, storage_key)
     return _detail(db, document)
+
+
+def _queue_ocr(db: Session, document: Document, actor: User) -> None:
+    """If the document's type lists OCR fields, read it in the background:
+    the document waits in 'processing' until OCR puts it up for review.
+    The task is queued in this transaction (it exists only if the upload is
+    saved) and keyed by document version, so it is queued once."""
+    from app.workers import ocr_handler
+
+    if not ocr_handler.wants_ocr(db, document):
+        return
+    document.status = DocumentStatus.PROCESSING.value
+    task_queue.enqueue(
+        db,
+        ocr_handler.TASK_TYPE,
+        ocr_handler.idempotency_key(document.id, document.current_version),
+        {"document_id": document.id, "version": document.current_version},
+        created_by=actor.id,
+    )
 
 
 def add_version(
     db: Session, document_id: int, file: CheckedFile, change_reason: str, actor: User
 ) -> DocumentDetail:
-    document, jobs = _lock_for_write(db, document_id, actor)
+    document, jobs = lock_for_write(db, document_id, actor)
     # Replacing a file un-verifies it, so it needs the same right as
     # verifying or rejecting (review M-1).
-    _ensure_can_review(db, document, actor)
+    ensure_can_review(db, document, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("An archived document cannot get new versions.")
-    _ensure_no_closed_job(jobs, actor, "replace")
+    ensure_no_closed_job(jobs, actor, "replace")
     if document.status == DocumentStatus.REJECTED.value:
         # Reviving a rejected document must not give a single-document
         # checklist item a second live document (review L-1).
@@ -447,13 +472,14 @@ def add_version(
     document.verified_at = None
     document.rejection_reason = None
     _audit(db, "document_version_added", document.id, actor, version=version)
+    _queue_ocr(db, document, actor)
     _commit_or_discard(db, storage_key)
     return _detail(db, document)
 
 
-def verify(db: Session, document_id: int, actor: User) -> DocumentDetail:
-    document, jobs = _lock_for_write(db, document_id, actor)
-    _ensure_can_review(db, document, actor)
+def apply_verify(db: Session, document: Document, jobs: list[Job], actor: User) -> None:
+    """Verify an already locked document (caller commits)."""
+    ensure_can_review(db, document, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("An archived document cannot be verified.")
     if document.status not in (
@@ -468,20 +494,44 @@ def verify(db: Session, document_id: int, actor: User) -> DocumentDetail:
                 else ""
             )
         )
-    _ensure_no_closed_job(jobs, actor, "verify")
+    ensure_no_closed_job(jobs, actor, "verify")
     document.status = DocumentStatus.VERIFIED.value
     document.verified_by = actor.id
     document.verified_at = _now()
     _audit(
         db, "document_verified", document.id, actor, version=document.current_version
     )
+
+
+def verify(db: Session, document_id: int, actor: User) -> DocumentDetail:
+    document, jobs = lock_for_write(db, document_id, actor)
+    ensure_can_review(db, document, actor)
+    # A document read by OCR is verified through the OCR review, so its
+    # extracted values are always looked at (review L-6).
+    from app.models import OcrResult
+
+    pending_review = db.scalar(
+        select(OcrResult.id).where(
+            OcrResult.document_id == document.id,
+            OcrResult.document_version == document.current_version,
+            OcrResult.reviewed_at.is_(None),
+        )
+    )
+    if pending_review is not None:
+        raise BusinessRuleError(
+            "This document was read by OCR: confirm its fields in the OCR "
+            "review to verify it."
+        )
+    apply_verify(db, document, jobs, actor)
     db.commit()
     return _detail(db, document)
 
 
-def reject(db: Session, document_id: int, reason: str, actor: User) -> DocumentDetail:
-    document, jobs = _lock_for_write(db, document_id, actor)
-    _ensure_can_review(db, document, actor)
+def apply_reject(
+    db: Session, document: Document, jobs: list[Job], reason: str, actor: User
+) -> None:
+    """Reject an already locked document (caller commits)."""
+    ensure_can_review(db, document, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("An archived document cannot be rejected.")
     if document.status == DocumentStatus.REJECTED.value:
@@ -507,21 +557,25 @@ def reject(db: Session, document_id: int, reason: str, actor: User) -> DocumentD
             reason=reason,
             job_ids=[j.id for j in jobs],
         )
-        db.commit()
-        return _detail(db, document)
-    _ensure_no_closed_job(jobs, actor, "reject")
+        return
+    ensure_no_closed_job(jobs, actor, "reject")
     document.status = DocumentStatus.REJECTED.value
     document.rejection_reason = reason
     document.verified_by = None
     document.verified_at = None
     _audit(db, "document_rejected", document.id, actor, reason=reason)
+
+
+def reject(db: Session, document_id: int, reason: str, actor: User) -> DocumentDetail:
+    document, jobs = lock_for_write(db, document_id, actor)
+    apply_reject(db, document, jobs, reason, actor)
     db.commit()
     return _detail(db, document)
 
 
 def archive(db: Session, document_id: int, reason: str, actor: User) -> DocumentDetail:
     """Admin only (enforced by the route)."""
-    document, _ = _lock_for_write(db, document_id, actor)
+    document, _ = lock_for_write(db, document_id, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("The document is already archived.")
     document.archived_at = _now()
@@ -599,7 +653,7 @@ def link_document(
         raise NotFoundError(job_service.JOB_NOT_FOUND)
     job = jobs[0]
     job_service.ensure_job_access(db, job.id, actor)
-    _ensure_no_closed_job([job], actor, "add")
+    ensure_no_closed_job([job], actor, "add")
     item = repo.get_checklist_item(db, item_id)
     if item is None or item.job_id != job.id:
         raise NotFoundError("Checklist item not found.")

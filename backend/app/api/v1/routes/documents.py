@@ -17,7 +17,9 @@ from app.schemas.document import (
 )
 from app.schemas.error import ErrorResponse
 from app.schemas.job import MAX_DB_INT
+from app.schemas.ocr import OcrRead, OcrReviewRequest, OcrReviewResponse
 from app.services import document_service as svc
+from app.services import ocr_service
 from app.services.file_validation import MAX_BYTES, FileTooLargeError, check_upload
 
 router = APIRouter(tags=["documents"], responses=AUTH_RESPONSES)
@@ -198,3 +200,44 @@ def link_document(
     db: DbSession,
 ) -> ChecklistResponse:
     return svc.link_document(db, job_id, item_id, payload.document_id, user)
+
+
+# ---------- OCR review ----------
+
+
+@router.get(
+    "/documents/{document_id}/ocr",
+    response_model=OcrRead,
+    responses={
+        **NOT_FOUND,
+        403: {"model": ErrorResponse, "description": "Reveal needs review rights"},
+    },
+)
+def get_ocr(
+    document_id: Id,
+    user: CurrentUser,
+    db: DbSession,
+    reveal: Annotated[
+        bool,
+        Query(description="Show sensitive values and raw text (audited)"),
+    ] = False,
+) -> OcrRead:
+    return ocr_service.get_ocr(db, document_id, user, reveal)
+
+
+@router.post(
+    "/documents/{document_id}/ocr/review",
+    response_model=OcrReviewResponse,
+    responses=WRITE,
+)
+def review_ocr(
+    document_id: Id, payload: OcrReviewRequest, user: CurrentUser, db: DbSession
+) -> OcrReviewResponse:
+    return ocr_service.review(db, document_id, payload, user)
+
+
+@router.post(
+    "/documents/{document_id}/ocr/retry", response_model=OcrRead, responses=WRITE
+)
+def retry_ocr(document_id: Id, user: CurrentUser, db: DbSession) -> OcrRead:
+    return ocr_service.retry(db, document_id, user)

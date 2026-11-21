@@ -15,6 +15,8 @@ import os
 
 # Test clients talk plain HTTP, so auth cookies must not be Secure-only.
 os.environ["COOKIE_SECURE"] = "false"
+# Tests use the fake OCR provider, which reads answers embedded in test files.
+os.environ["OCR_PROVIDER"] = "fake"
 
 from collections.abc import Callable, Iterator
 from decimal import Decimal

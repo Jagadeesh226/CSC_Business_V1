@@ -140,7 +140,9 @@ def catalogue(db_session):
         code="AADHAAR",
         name="Aadhaar card",
         sensitivity="sensitive",
-        ocr_fields=[{"key": "name", "label": "Name", "sensitive": False}],
+        # No OCR fields: these tests cover the document lifecycle without OCR
+        # (see test_ocr.py for documents that are read automatically).
+        ocr_fields=[],
     )
     rc = DocumentType(code="RC", name="RC book")
     photo = DocumentType(code="PHOTO", name="Photo")

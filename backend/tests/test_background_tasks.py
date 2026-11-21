@@ -15,7 +15,8 @@ from app.workers import notifier, registry
 from app.workers.registry import PermanentTaskError, TaskError
 from app.workers.worker import Worker, backoff_seconds
 
-TASK = "document_ocr"
+# A task type with no real handler yet, so tests can register a fake one.
+TASK = "vehicle_expiry_lookup"
 API = "/api/v1/tasks"
 
 
@@ -63,11 +64,15 @@ def handler():
             raise behaviour["raise"]
         return behaviour["result"]
 
+    previous = registry.get_spec(TASK)
     registry.register(TASK, run, timeout_seconds=5, max_attempts=3)
     try:
         yield calls, behaviour
     finally:
+        # Put back the real document_ocr handler for other test modules.
         registry.unregister(TASK)
+        if previous is not None:
+            registry._REGISTRY[TASK] = previous
 
 
 def enqueue(factory, key="doc:1:v1", payload=None):
@@ -556,9 +561,9 @@ def test_malformed_redis_url_does_not_break_commit(factory, handler, monkeypatch
     assert created and task(factory, task_id).status == "queued"
 
 
-def test_limits_do_not_depend_on_handler_registration(factory):
+def test_limits_do_not_depend_on_handler_registration(factory, handler):
     """Review L-6: the API enqueues without importing handlers."""
-    registry.unregister(TASK)
+    registry.unregister(TASK)  # the handler fixture restores it afterwards
     task_id, _ = enqueue(factory)
     row = task(factory, task_id)
     assert (row.timeout_seconds, row.max_attempts) == registry.limits_for(TASK)
