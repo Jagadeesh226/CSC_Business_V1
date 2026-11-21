@@ -75,17 +75,19 @@ def current_year(db: Session, timezone: str, at: datetime | None = None) -> int:
     return int(db.scalar(select(func.extract("year", func.timezone(timezone, moment)))))
 
 
-def sync_sequence_to_existing_job_numbers(
-    db: Session, name: str, year: int, prefix: str
+def sync_sequence_to_existing_numbers(
+    db: Session, name: str, year: int, prefix: str, column
 ) -> None:
-    """Advance a counter past the highest existing job number with ``prefix``.
+    """Advance a counter past the highest existing number with ``prefix`` in
+    ``column`` (job or receipt numbers). Never lowers it.
 
-    Recovers from job numbers the counter did not issue. Never lowers it.
+    Recovers from numbers the counter did not issue (restored or imported
+    data, a lost counter row).
     """
-    suffix = func.substring(Job.job_number, len(prefix) + 1)
+    suffix = func.substring(column, len(prefix) + 1)
     highest = db.scalar(
         select(func.max(cast(suffix, BigInteger))).where(
-            Job.job_number.startswith(prefix, autoescape=True),
+            column.startswith(prefix, autoescape=True),
             suffix.regexp_match("^[0-9]+$"),
         )
     )
@@ -102,6 +104,12 @@ def sync_sequence_to_existing_job_numbers(
             },
         )
     )
+
+
+def sync_sequence_to_existing_job_numbers(
+    db: Session, name: str, year: int, prefix: str
+) -> None:
+    sync_sequence_to_existing_numbers(db, name, year, prefix, Job.job_number)
 
 
 def next_sequence_value(db: Session, name: str, year: int) -> int:
