@@ -65,6 +65,14 @@ class Document(Base):
         ForeignKey("users.id", name="fk_documents_archived_by_users")
     )
     archive_reason: Mapped[str | None] = mapped_column(Text)
+    # Set when a verified document shared by several jobs is rejected: the
+    # jobs already using it keep it verified, but it cannot be used for new
+    # jobs (owner decision).
+    reuse_blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reuse_blocked_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", name="fk_documents_reuse_blocked_by_users")
+    )
+    reuse_block_reason: Mapped[str | None] = mapped_column(Text)
     # Legacy column from the first schema; OCR results get their own table.
     ocr_text: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

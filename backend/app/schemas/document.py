@@ -49,6 +49,10 @@ class DocumentRead(BaseModel):
     verified_at: datetime | None
     archived_at: datetime | None
     archive_reason: str | None
+    # False once a verified document shared by several jobs was rejected:
+    # the jobs using it keep it, but it cannot be used for new jobs.
+    reusable: bool
+    reuse_block_reason: str | None
     # Jobs this document is used by.
     job_ids: list[int]
 
