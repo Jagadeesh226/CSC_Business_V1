@@ -200,3 +200,17 @@ def link_exists(db: Session, job_id: int, document_id: int) -> bool:
         )
         is not None
     )
+
+
+def single_items_of_document(db: Session, document_id: int) -> list[JobChecklistItem]:
+    """Single-document checklist items this document is attached to."""
+    return list(
+        db.scalars(
+            select(JobChecklistItem)
+            .join(JobDocument, JobDocument.checklist_item_id == JobChecklistItem.id)
+            .where(
+                JobDocument.document_id == document_id,
+                JobChecklistItem.allow_multiple.is_(False),
+            )
+        )
+    )

@@ -3,6 +3,7 @@
 import hashlib
 import io
 import re
+import threading
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -12,6 +13,8 @@ from app.services.errors import BusinessRuleError, ServiceError
 
 MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 MAX_PDF_PAGES = 20
+# Parsing a hostile PDF can take a lot of memory; parse a few at a time.
+_PDF_PARSE_SLOTS = threading.BoundedSemaphore(2)
 
 # (content type, allowed extensions, signature check)
 _TYPES = (
@@ -62,10 +65,18 @@ def check_upload(data: bytes, filename: str | None) -> CheckedFile:
     page_count = None
     if content_type == "application/pdf":
         try:
-            reader = PdfReader(io.BytesIO(data))
-            if reader.is_encrypted:
-                raise BusinessRuleError("Password-protected PDFs are not accepted.")
-            page_count = len(reader.pages)
+            with _PDF_PARSE_SLOTS:
+                reader = PdfReader(io.BytesIO(data))
+                if reader.is_encrypted:
+                    raise BusinessRuleError("Password-protected PDFs are not accepted.")
+                # The declared page count is checked before walking the page
+                # tree, so an oversized PDF is refused cheaply.
+                declared = reader.trailer["/Root"]["/Pages"].get("/Count", 0)
+                if not isinstance(declared, int) or declared > MAX_PDF_PAGES:
+                    raise BusinessRuleError(
+                        f"PDFs can have at most {MAX_PDF_PAGES} pages."
+                    )
+                page_count = len(reader.pages)
         except BusinessRuleError:
             raise
         except Exception as exc:  # any parse failure of an untrusted file

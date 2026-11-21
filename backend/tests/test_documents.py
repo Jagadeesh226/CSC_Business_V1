@@ -755,3 +755,213 @@ def test_concurrent_uploads_to_single_item(test_engine, committed):
     assert isinstance(result.get("error"), ConflictError), result
     with Session(test_engine) as session:
         assert len(session.scalars(select(Document)).all()) == 1
+
+
+# ---------- review fixes ----------
+
+
+def test_employee_cannot_replace_document_of_someone_elses_job(
+    client, make_client, make_user, job, customer, catalogue
+):
+    """Review M-1: replacing needs the same right as verifying."""
+    doc = upload_for(client, job, "AADHAAR").json()
+    client.post(f"{API}/documents/{doc['id']}/verify")
+    other_job = client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": catalogue["service"].id,
+            "title": "B",
+        },
+    ).json()
+    e2_user = make_user()
+    client.post(
+        f"{API}/jobs/{other_job['id']}/assignments", json={"user_id": e2_user.id}
+    )
+    e2 = make_client(e2_user)
+
+    assert e2.get(f"{API}/documents/{doc['id']}").status_code == 200  # may see it
+    replace = e2.post(
+        f"{API}/documents/{doc['id']}/versions",
+        files={"file": ("v2.png", PNG, "image/png")},
+        data={"change_reason": "mine now"},
+    )
+    assert replace.status_code == 403
+    assert item_for(client, job["id"], "AADHAAR")["state"] == "verified"
+
+
+def test_oversized_upload_refused_before_sign_in(anon_client, customer, tmp_path):
+    """Review M-2: a big anonymous body is refused without being stored."""
+    big = b"0" * (11 * 1024 * 1024)
+    response = anon_client.post(
+        f"{API}/customers/{customer.id}/documents",
+        files={"file": ("big.png", big, "image/png")},
+    )
+    assert response.status_code == 413
+    assert response.json() == {"detail": "Files can be at most 10 MB."}
+
+
+def test_body_limit_counts_streamed_bytes():
+    """Review M-2: no Content-Length (chunked) is counted as it arrives."""
+    import asyncio
+
+    from app.core.body_limit import UploadBodyLimit
+
+    reached_app = []
+
+    async def app(scope, receive, send):
+        reached_app.append(True)
+
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+
+    chunks = iter([b"a" * 600, b"b" * 600])
+
+    async def receive():
+        chunk = next(chunks, b"")
+        return {"type": "http.request", "body": chunk, "more_body": chunk != b""}
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/customers/1/documents",
+        "headers": [],
+    }
+    asyncio.run(UploadBodyLimit(app, max_body=1000)(scope, receive, send))
+    assert reached_app == []
+    assert sent[0]["status"] == 413
+
+
+def test_reviving_rejected_document_cannot_double_fill_item(client, job):
+    """Review L-1."""
+    first = upload_for(client, job, "AADHAAR").json()
+    client.post(f"{API}/documents/{first['id']}/reject", json={"reason": "Blurry"})
+    upload_for(client, job, "AADHAAR")  # the replacement document
+    revive = client.post(
+        f"{API}/documents/{first['id']}/versions",
+        files={"file": ("v2.png", PNG, "image/png")},
+        data={"change_reason": "retry"},
+    )
+    assert revive.status_code == 409
+    assert (
+        len(
+            [
+                d
+                for d in item_for(client, job["id"], "AADHAAR")["documents"]
+                if d["status"] != "rejected"
+            ]
+        )
+        == 1
+    )
+
+
+def test_failed_commit_removes_stored_file(db_session, document_storage, customer):
+    """Review L-3: no orphan encrypted file when the database write fails."""
+    before = {p for p in document_storage.rglob("*") if p.is_file()}
+    admin = User(name="A", email="a.l3@example.com", password_hash="x", role="admin")
+    db_session.add(admin)
+    db_session.flush()
+
+    def fail():
+        raise RuntimeError("database went away")
+
+    original = db_session.commit
+    db_session.commit = fail
+    try:
+        with pytest.raises(RuntimeError):
+            document_service.upload(
+                db_session, customer.id, check_upload(PNG, "a.png"), admin
+            )
+    finally:
+        db_session.commit = original
+    after = {p for p in document_storage.rglob("*") if p.is_file()}
+    assert after == before
+
+
+@pytest.mark.parametrize("bad_key", ["not base64!!", "c2hvcnQ="])
+def test_malformed_storage_key_is_503(client, customer, monkeypatch, bad_key):
+    """Review L-4."""
+    monkeypatch.setenv("DOCUMENT_ENCRYPTION_KEY", bad_key)
+    assert upload(client, customer.id).status_code == 503
+
+
+def test_views_and_denied_attempts_are_audited(
+    client, make_client, make_user, job, db_session
+):
+    """Review L-5."""
+    doc = upload_for(client, job, "AADHAAR").json()
+    client.get(f"{API}/documents/{doc['id']}")
+    outsider_user = make_user()
+    make_client(outsider_user).get(f"{API}/documents/{doc['id']}/download")
+
+    rows = db_session.execute(
+        select(AuditLog.action, AuditLog.user_id)
+        .where(AuditLog.entity_type == "document", AuditLog.entity_id == doc["id"])
+        .order_by(AuditLog.id)
+    ).all()
+    assert ("document_viewed", job["created_by"]) in rows
+    assert ("document_access_denied", outsider_user.id) in rows
+
+
+def test_pdf_declaring_too_many_pages_is_refused_cheaply():
+    """Review L-7: the declared /Count is checked before the page tree."""
+    with pytest.raises(BusinessRuleError, match="at most 20 pages"):
+        check_upload(pdf_bytes(25), "big.pdf")
+
+
+def test_reject_and_submit_race(test_engine, committed):
+    """Review L-6: a reject in flight is seen by a concurrent submit."""
+    customer_id, job_id, item_id, admin_id = committed
+    with Session(test_engine, autoflush=False) as session:
+        admin = session.get(User, admin_id)
+        doc = document_service.upload(
+            session,
+            customer_id,
+            check_upload(PNG, "a.png"),
+            admin,
+            job_id=job_id,
+            checklist_item_id=item_id,
+        )
+        document_service.verify(session, doc.id, admin)
+        for status in ("in_progress",):
+            job_service.change_status(
+                session, job_id, job_service.JobStatus(status), actor=admin
+            )
+
+    holder = Session(test_engine, autoflush=False)
+    result: dict[str, object] = {}
+    try:
+        real_commit = holder.commit
+        holder.commit = holder.flush  # pause: keep the job and document locks
+        document_service.reject(
+            holder, doc.id, "Wrong person", holder.get(User, admin_id)
+        )
+        holder.commit = real_commit
+
+        def submit():
+            with Session(test_engine, autoflush=False) as session:
+                try:
+                    result["value"] = job_service.change_status(
+                        session,
+                        job_id,
+                        job_service.JobStatus("submitted"),
+                        actor=session.get(User, admin_id),
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    result["error"] = exc
+
+        thread = threading.Thread(target=submit)
+        thread.start()
+        thread.join(timeout=1)
+        blocked = thread.is_alive()
+        holder.commit()
+    finally:
+        holder.close()
+    thread.join(timeout=10)
+
+    assert blocked, f"expected the submit to wait for the reject, got {result}"
+    assert isinstance(result.get("error"), BusinessRuleError), result
+    with Session(test_engine) as session:
+        assert session.get(Job, job_id).status == "in_progress"

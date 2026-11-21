@@ -35,6 +35,8 @@ class Storage(Protocol):
 
     def load(self, storage_key: str) -> bytes: ...
 
+    def delete(self, storage_key: str) -> None: ...
+
 
 def generate_key() -> str:
     return base64.urlsafe_b64encode(AESGCM.generate_key(bit_length=256)).decode()
@@ -58,7 +60,8 @@ class LocalEncryptedStorage:
         name = secrets.token_hex(16)
         storage_key = f"{name[:2]}/{name}"
         path = self._path(storage_key)
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self._root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        path.parent.mkdir(exist_ok=True, mode=0o700)
         nonce = secrets.token_bytes(NONCE_BYTES)
         sealed = (
             FORMAT_PREFIX
@@ -67,12 +70,23 @@ class LocalEncryptedStorage:
         )
         tmp = path.with_suffix(".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(sealed)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, path)
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(sealed)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
         return storage_key
+
+    def delete(self, storage_key: str) -> None:
+        """Best effort: only used to undo a write whose database row failed."""
+        try:
+            self._path(storage_key).unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
 
     def load(self, storage_key: str) -> bytes:
         sealed = self._path(storage_key).read_bytes()
@@ -92,7 +106,12 @@ def get_storage() -> Storage:
         raise StorageNotConfigured(
             "DOCUMENT_STORAGE_DIR and DOCUMENT_ENCRYPTION_KEY must be set."
         )
-    key = base64.urlsafe_b64decode(key_b64)
+    try:
+        key = base64.b64decode(key_b64, altchars=b"-_", validate=True)
+    except (ValueError, TypeError):
+        raise StorageNotConfigured(
+            "DOCUMENT_ENCRYPTION_KEY is not valid base64."
+        ) from None
     if len(key) != 32:
         raise StorageNotConfigured("DOCUMENT_ENCRYPTION_KEY must be 32 bytes.")
     return LocalEncryptedStorage(Path(root), key)

@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError
 
 from app.api.v1.router import api_router
+from app.core.body_limit import UploadBodyLimit
 from app.core.storage import StorageNotConfigured
 from app.services.errors import ServiceError
 
@@ -12,6 +13,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Outermost after CORS: oversized uploads are refused before any parsing.
+app.add_middleware(UploadBodyLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

@@ -88,20 +88,36 @@ def can_access(db: Session, document: Document, user: User) -> bool:
     )
 
 
+def _deny(db: Session, document: Document | None, user: User) -> None:
+    """404 for a missing or forbidden document; forbidden attempts on real
+    documents are audited (requirements: audit denied access)."""
+    if document is not None:
+        db.rollback()
+        _audit(db, "document_access_denied", document.id, user)
+        db.commit()
+    raise NotFoundError(DOCUMENT_NOT_FOUND)
+
+
 def _get_accessible(db: Session, document_id: int, user: User) -> Document:
     document = repo.get_document(db, document_id)
     if document is None or not can_access(db, document, user):
-        raise NotFoundError(DOCUMENT_NOT_FOUND)
+        _deny(db, document, user)
     return document
 
 
 def _lock_for_write(db: Session, document_id: int, user: User):
-    """Lock the document's jobs then the document; check read access."""
-    document = repo.get_document(db, document_id)
-    if document is None or not can_access(db, document, user):
-        raise NotFoundError(DOCUMENT_NOT_FOUND)
-    jobs = repo.lock_jobs(db, repo.linked_job_ids(db, document_id))
+    """Lock the document's jobs then the document; check read access.
+
+    If the document gained or lost a job link between reading the links and
+    locking it, the caller is asked to retry, so the closed-job and submit
+    checks always see every job the document belongs to.
+    """
+    document = _get_accessible(db, document_id, user)
+    job_ids = repo.linked_job_ids(db, document.id)
+    jobs = repo.lock_jobs(db, job_ids)
     document = repo.lock_document(db, document_id)
+    if repo.linked_job_ids(db, document_id) != job_ids:
+        raise ConflictError("The document changed while saving. Please retry.")
     return document, jobs
 
 
@@ -174,6 +190,8 @@ def _reads(db: Session, docs: list[Document]) -> list[DocumentRead]:
 
 def get_document(db: Session, document_id: int, viewer: User) -> DocumentDetail:
     document = _get_accessible(db, document_id, viewer)
+    _audit(db, "document_viewed", document.id, viewer)
+    db.commit()
     return _detail(db, document)
 
 
@@ -255,7 +273,7 @@ def _store(
     version: int,
     actor: User,
     change_reason: str | None,
-) -> None:
+) -> str:
     storage_key = get_storage().save(file.data)
     repo.add(
         db,
@@ -279,6 +297,18 @@ def _store(
     document.sha256 = file.sha256
     document.page_count = file.page_count
     document.current_version = version
+    return storage_key
+
+
+def _commit_or_discard(db: Session, storage_key: str) -> None:
+    """Commit; if that fails, remove the file just written so no orphan
+    encrypted file is left without a database row."""
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        get_storage().delete(storage_key)
+        raise
 
 
 def _occupied(db: Session, item: JobChecklistItem) -> bool:
@@ -363,7 +393,7 @@ def upload(
             status=DocumentStatus.UPLOADED.value,
         ),
     )
-    _store(db, document, file, 1, actor, None)
+    storage_key = _store(db, document, file, 1, actor, None)
     if job_id is not None:
         repo.add(
             db,
@@ -384,7 +414,7 @@ def upload(
         content_type=file.content_type,
         size_bytes=file.size_bytes,
     )
-    db.commit()
+    _commit_or_discard(db, storage_key)
     return _detail(db, document)
 
 
@@ -392,18 +422,30 @@ def add_version(
     db: Session, document_id: int, file: CheckedFile, change_reason: str, actor: User
 ) -> DocumentDetail:
     document, jobs = _lock_for_write(db, document_id, actor)
+    # Replacing a file un-verifies it, so it needs the same right as
+    # verifying or rejecting (review M-1).
+    _ensure_can_review(db, document, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("An archived document cannot get new versions.")
     _ensure_no_closed_job(jobs, actor, "replace")
+    if document.status == DocumentStatus.REJECTED.value:
+        # Reviving a rejected document must not give a single-document
+        # checklist item a second live document (review L-1).
+        for item in repo.single_items_of_document(db, document.id):
+            if _occupied(db, item):
+                raise ConflictError(
+                    f"'{item.document_type_name}' already has another document "
+                    "for this job."
+                )
     version = document.current_version + 1
-    _store(db, document, file, version, actor, change_reason)
+    storage_key = _store(db, document, file, version, actor, change_reason)
     # A new file must be checked again.
     document.status = DocumentStatus.UPLOADED.value
     document.verified_by = None
     document.verified_at = None
     document.rejection_reason = None
     _audit(db, "document_version_added", document.id, actor, version=version)
-    db.commit()
+    _commit_or_discard(db, storage_key)
     return _detail(db, document)
 
 
