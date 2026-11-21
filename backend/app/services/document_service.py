@@ -182,6 +182,8 @@ def _reads(db: Session, docs: list[Document]) -> list[DocumentRead]:
             verified_at=d.verified_at,
             archived_at=d.archived_at,
             archive_reason=d.archive_reason,
+            reusable=d.reuse_blocked_at is None,
+            reuse_block_reason=d.reuse_block_reason,
             job_ids=links[d.id],
         )
         for d in docs
@@ -486,6 +488,27 @@ def reject(db: Session, document_id: int, reason: str, actor: User) -> DocumentD
         raise BusinessRuleError("The document is already rejected.")
     if document.status == DocumentStatus.PROCESSING.value:
         raise BusinessRuleError("Wait for processing to finish before rejecting.")
+    if document.status == DocumentStatus.VERIFIED.value and len(jobs) >= 2:
+        # Owner decision: a verified document shared by several jobs is not
+        # un-verified for the jobs already using it; it is flagged so it
+        # cannot be used for any new job.
+        if document.reuse_blocked_at is not None:
+            raise BusinessRuleError(
+                "The document is already flagged and cannot be reused."
+            )
+        document.reuse_blocked_at = _now()
+        document.reuse_blocked_by = actor.id
+        document.reuse_block_reason = reason
+        _audit(
+            db,
+            "document_reuse_blocked",
+            document.id,
+            actor,
+            reason=reason,
+            job_ids=[j.id for j in jobs],
+        )
+        db.commit()
+        return _detail(db, document)
     _ensure_no_closed_job(jobs, actor, "reject")
     document.status = DocumentStatus.REJECTED.value
     document.rejection_reason = reason
@@ -592,6 +615,11 @@ def link_document(
         raise BusinessRuleError("An archived document cannot be used.")
     if document.status != DocumentStatus.VERIFIED.value:
         raise BusinessRuleError("Only verified documents can be reused.")
+    if document.reuse_blocked_at is not None:
+        raise BusinessRuleError(
+            "This document was flagged and cannot be used for new jobs: "
+            f"{document.reuse_block_reason}"
+        )
     if document.document_type_id != item.document_type_id:
         raise BusinessRuleError("The document type does not match the checklist item.")
     if repo.link_exists(db, job.id, document.id):

@@ -965,3 +965,81 @@ def test_reject_and_submit_race(test_engine, committed):
     assert isinstance(result.get("error"), BusinessRuleError), result
     with Session(test_engine) as session:
         assert session.get(Job, job_id).status == "in_progress"
+
+
+# ---------- owner decision: rejecting a shared verified document ----------
+
+
+def _new_job(client, customer, catalogue, title):
+    return client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": catalogue["service"].id,
+            "title": title,
+        },
+    ).json()
+
+
+def _reuse(client, job, doc_id):
+    item = item_for(client, job["id"], "AADHAAR")
+    return client.post(
+        f"{API}/jobs/{job['id']}/checklist/{item['id']}/documents",
+        json={"document_id": doc_id},
+    )
+
+
+def test_rejecting_shared_document_keeps_jobs_verified_but_blocks_reuse(
+    client, admin_user, job, customer, catalogue, db_session
+):
+    doc = upload_for(client, job, "AADHAAR").json()
+    client.post(f"{API}/documents/{doc['id']}/verify")
+    second = _new_job(client, customer, catalogue, "Second")
+    assert _reuse(client, second, doc["id"]).status_code == 201
+
+    response = client.post(
+        f"{API}/documents/{doc['id']}/reject", json={"reason": "Address outdated"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "verified"  # jobs already using it are unaffected
+    assert body["reusable"] is False
+    assert body["reuse_block_reason"] == "Address outdated"
+    for existing in (job, second):
+        assert item_for(client, existing["id"], "AADHAAR")["state"] == "verified"
+
+    third = _new_job(client, customer, catalogue, "Third")
+    blocked = _reuse(client, third, doc["id"])
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"] == (
+        "This document was flagged and cannot be used for new jobs: Address outdated"
+    )
+    again = client.post(f"{API}/documents/{doc['id']}/reject", json={"reason": "x"})
+    assert again.status_code == 422
+
+    entry = db_session.scalar(
+        select(AuditLog).where(AuditLog.action == "document_reuse_blocked")
+    )
+    assert entry.user_id == admin_user.id
+    assert json.loads(entry.details) == {
+        "reason": "Address outdated",
+        "job_ids": sorted([job["id"], second["id"]]),
+    }
+
+
+def test_rejecting_document_of_one_job_rejects_it(client, job):
+    doc = upload_for(client, job, "AADHAAR").json()
+    client.post(f"{API}/documents/{doc['id']}/verify")
+    body = client.post(
+        f"{API}/documents/{doc['id']}/reject", json={"reason": "Wrong person"}
+    ).json()
+    assert body["status"] == "rejected"
+    assert body["reusable"] is True
+    assert item_for(client, job["id"], "AADHAAR")["state"] == "rejected"
+
+
+def test_documents_report_reusable_by_default(client, job):
+    doc = upload_for(client, job, "AADHAAR").json()
+    assert doc["reusable"] is True
+    assert doc["reuse_block_reason"] is None

@@ -2,7 +2,8 @@
 
 - documents gain a type, file details (size, SHA-256, pages), a current
   version, a status (uploaded/processing/needs_review/verified/rejected),
-  verification and archive fields; customer_id becomes required.
+  verification and archive fields, and a reuse block (a rejected document
+  that other jobs still use); customer_id becomes required.
 - document_versions: immutable stored files, one row per version.
 - job_checklist_items: each job's document checklist, frozen from its
   service's active requirements. Existing open jobs get one now.
@@ -218,6 +219,23 @@ def upgrade() -> None:
     op.create_foreign_key(
         "fk_documents_archived_by_users", "documents", "users", ["archived_by"], ["id"]
     )
+    op.add_column(
+        "documents",
+        sa.Column("reuse_blocked_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "documents", sa.Column("reuse_blocked_by", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "documents", sa.Column("reuse_block_reason", sa.Text(), nullable=True)
+    )
+    op.create_foreign_key(
+        "fk_documents_reuse_blocked_by_users",
+        "documents",
+        "users",
+        ["reuse_blocked_by"],
+        ["id"],
+    )
     op.create_check_constraint(
         "ck_documents_status",
         "documents",
@@ -254,6 +272,12 @@ def downgrade() -> None:
     """Downgrade schema."""
     _refuse_if_documents_exist("downgrade")
     op.drop_constraint("ck_documents_status", "documents", type_="check")
+    op.drop_constraint(
+        "fk_documents_reuse_blocked_by_users", "documents", type_="foreignkey"
+    )
+    op.drop_column("documents", "reuse_block_reason")
+    op.drop_column("documents", "reuse_blocked_by")
+    op.drop_column("documents", "reuse_blocked_at")
     op.drop_column("jobs", "service_name")
     op.drop_constraint(
         "fk_documents_archived_by_users", "documents", type_="foreignkey"
