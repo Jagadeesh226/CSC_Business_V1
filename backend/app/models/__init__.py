@@ -10,6 +10,7 @@ from app.models.job_checklist_item import JobChecklistItem
 from app.models.job_document import JobDocument
 from app.models.job_fee import JobFee
 from app.models.job_status_history import JobStatusHistory
+from app.models.ocr import OcrResult
 from app.models.payment import Payment
 from app.models.sequence_counter import SequenceCounter
 from app.models.service import Service
@@ -33,6 +34,7 @@ __all__ = [
     "JobDocument",
     "JobFee",
     "JobStatusHistory",
+    "OcrResult",
     "Payment",
     "SequenceCounter",
     "Service",

@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError
@@ -40,6 +42,17 @@ def api_health():
 @app.exception_handler(ServiceError)
 def handle_service_error(_: Request, exc: ServiceError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    # FastAPI's default echoes each rejected value ("input"), which could be an
+    # Aadhaar or PAN number from an OCR review; report only where and why.
+    errors = [
+        {k: v for k, v in error.items() if k not in ("input", "ctx", "url")}
+        for error in exc.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
 
 
 @app.exception_handler(DataError)

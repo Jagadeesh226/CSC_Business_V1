@@ -53,6 +53,14 @@ def retry_task(db: Session, task_id: int, actor: User) -> TaskRead:
     task = repo.lock(db, task_id)
     if task is None:
         raise NotFoundError("Task not found.")
+    if task.task_type == TaskType.DOCUMENT_OCR.value:
+        # The document has to be put back in 'processing' with the task;
+        # that is what the document's own OCR retry does (review M-1).
+        document_id = task.payload.get("document_id")
+        raise BusinessRuleError(
+            "Retry OCR from the document instead: "
+            f"POST /api/v1/documents/{document_id}/ocr/retry."
+        )
     if task.status != TaskStatus.FAILED.value:
         raise BusinessRuleError(
             f"Only failed tasks can be retried (this one is {task.status})."
