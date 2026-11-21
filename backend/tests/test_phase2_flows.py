@@ -7,14 +7,14 @@ employee reviews them from the queue, and the job moves to submission.
 Payments and receipts are Phase 3.
 
 The worker runs inside the test's transaction (savepoints instead of
-commits), so nothing leaks between tests.
+commits), so nothing leaks between tests; see ``run_worker``.
 """
 
 import itertools
 import json
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import sessionmaker
 
 from app.models import AuditLog, BackgroundTask, Customer
@@ -40,22 +40,50 @@ def photo() -> bytes:
     return PNG + f"passport-photo-{next(_unique)}".encode()
 
 
-def run_worker(db_session) -> int:
-    """One tick of the real worker, on the test's connection."""
+def run_worker(db_session, expect: int) -> None:
+    """One tick of the real worker, on the test's connection; ``expect`` is
+    how many tasks it must run.
+
+    Inside the test transaction ``now()`` never moves, so a task scheduled
+    for "later" (a retry, a backoff) is made due first, as if time passed.
+    Each step is committed (a savepoint release) so a later request's
+    rollback cannot undo the worker's work, as in production.
+    """
+    db_session.commit()
     connection = db_session.connection()
+    connection.execute(
+        update(BackgroundTask)
+        .where(BackgroundTask.status == "queued", BackgroundTask.run_after > func.now())
+        .values(run_after=func.now())
+    )
     factory = sessionmaker(
         bind=connection, join_transaction_mode="create_savepoint", autoflush=False
     )
     worker = Worker(factory, worker_id="counter-worker")
+    # The handler thread shares this connection safely: run_one waits for
+    # it (the fake provider never comes near the task's time limit).
     worker._handler_sessions = sessionmaker(
         bind=connection,
         class_=HandlerSession,
         join_transaction_mode="create_savepoint",
         autoflush=False,
     )
-    done = worker.tick()
+    assert worker.tick() == expect
+    # The handler's SET LOCAL limits would otherwise last for the rest of
+    # the test transaction.
+    for setting in (
+        "statement_timeout",
+        "lock_timeout",
+        "idle_in_transaction_session_timeout",
+    ):
+        connection.execute(text(f"SET LOCAL {setting} TO DEFAULT"))
+    db_session.commit()
     db_session.expire_all()
-    return done
+
+
+def ok(response, code=200):
+    assert response.status_code == code, response.text
+    return response.json()
 
 
 @pytest.fixture
@@ -160,6 +188,21 @@ class Counter:
     def job(self, job_id):
         return self.c.get(f"{API}/jobs/{job_id}").json()
 
+    def review(self, document_id, name, decision="verify", **extra):
+        """Confirm every OCR field of an Aadhaar and decide."""
+        return self.c.post(
+            f"{API}/documents/{document_id}/ocr/review",
+            json={
+                "fields": {
+                    "name": name,
+                    "aadhaar_number": "1234 5678 9012",
+                    "address": None,
+                },
+                "decision": decision,
+                **extra,
+            },
+        )
+
     def move(self, job_id, status, **extra):
         return self.c.post(
             f"{API}/jobs/{job_id}/status", json={"status": status, **extra}
@@ -200,7 +243,7 @@ def test_new_customer_from_counter_to_submission(
     assert fees["items"][0]["amount"] == "107.00"
     summary = desk.queue()
     assert (summary["jobs_missing_documents"], summary["documents_to_review"]) == (1, 0)
-    desk.move(job["id"], "in_progress")
+    ok(desk.move(job["id"], "in_progress"))
 
     # 3. Scans the Aadhaar and the photo; OCR is queued for the Aadhaar only.
     aadhaar = desk.upload(job, "AADHAAR", aadhaar_scan(address="12 MG Road"))
@@ -210,7 +253,7 @@ def test_new_customer_from_counter_to_submission(
     assert desk.queue()["jobs_processing"] == 1
 
     # 4. The background worker reads the Aadhaar.
-    assert run_worker(db_session) == 1
+    run_worker(db_session, expect=1)
     queue = desk.review_queue()
     assert [(i["document_id"], i["review_kind"]) for i in queue] == [
         (aadhaar["id"], "ocr_check"),
@@ -278,7 +321,8 @@ def test_new_customer_from_counter_to_submission(
         "customer_updated_from_ocr"
     )
     trail = db_session.scalars(select(AuditLog.details)).all()
-    assert "1234 5678 9012" not in json.dumps(trail)
+    for form in ("1234 5678 9012", "123456789012", "5678 9012"):
+        assert form not in json.dumps(trail)
     task = db_session.scalar(select(BackgroundTask))
     assert task.status == "succeeded"
     assert "1234" not in json.dumps(task.result)
@@ -294,18 +338,8 @@ def test_returning_customer_reuses_a_verified_aadhaar(
     customer = desk.new_customer("Ravi Kumar", "9876543210")["customer"]
     first = desk.open_job(customer["id"], "PAN for Ravi")
     aadhaar = desk.upload(first, "AADHAAR", aadhaar_scan())
-    run_worker(db_session)
-    employee.post(
-        f"{API}/documents/{aadhaar['id']}/ocr/review",
-        json={
-            "fields": {
-                "name": "Ravi Kumar",
-                "aadhaar_number": "1234 5678 9012",
-                "address": None,
-            },
-            "decision": "verify",
-        },
-    )
+    run_worker(db_session, expect=1)
+    ok(desk.review(aadhaar["id"], "Ravi Kumar"))
 
     # Weeks later he is back for another service: found by phone, and the
     # Aadhaar does not have to be scanned again.
@@ -322,7 +356,7 @@ def test_returning_customer_reuses_a_verified_aadhaar(
     assert linked.status_code == 201, linked.text
     progress = desk.job(second["id"])["document_progress"]
     assert (progress["verified"], progress["missing"]) == (1, 1)
-    assert run_worker(db_session) == 0  # nothing to read again
+    run_worker(db_session, expect=0)  # nothing to read again
 
 
 # ---------- a bad scan ----------
@@ -334,16 +368,14 @@ def test_unreadable_scan_goes_to_manual_review_and_is_replaced(
     desk = Counter(employee, catalogue["service"])
     customer = desk.new_customer("Meena", "9000011111")["customer"]
     job = desk.open_job(customer["id"])
-    desk.move(job["id"], "in_progress")
-    desk.upload(job, "PHOTO", photo())
-    employee.post(
-        f"{API}/documents/{desk.item(job, 'PHOTO')['documents'][0]['id']}/verify"
-    )
+    ok(desk.move(job["id"], "in_progress"))
+    picture = desk.upload(job, "PHOTO", photo())
+    ok(employee.post(f"{API}/documents/{picture['id']}/verify"))
 
     # The scan is unreadable: OCR fails for good, and the document waits for
     # a person instead of being stuck.
     blurry = desk.upload(job, "AADHAAR", aadhaar_scan(error="unsupported"))
-    run_worker(db_session)
+    run_worker(db_session, expect=1)
     entry = desk.review_queue()[0]
     assert (entry["document_id"], entry["review_kind"]) == (blurry["id"], "ocr_failed")
 
@@ -360,28 +392,24 @@ def test_unreadable_scan_goes_to_manual_review_and_is_replaced(
     # The customer brings a clear copy: a new version is read and reviewed.
     replaced = employee.post(
         f"{API}/documents/{blurry['id']}/versions",
-        files={"file": ("aadhaar.png", aadhaar_scan(name="Meena"), "image/png")},
+        # OCR reads a fuller name than the customer record has.
+        files={"file": ("aadhaar.png", aadhaar_scan(name="Meena Devi"), "image/png")},
         data={"change_reason": "Clear copy from the customer"},
     )
     assert replaced.status_code == 201, replaced.text
-    run_worker(db_session)
+    run_worker(db_session, expect=1)
     assert desk.review_queue()[0]["review_kind"] == "ocr_check"
-    employee.post(
-        f"{API}/documents/{blurry['id']}/ocr/review",
-        json={
-            "fields": {
-                "name": "Meena",
-                "aadhaar_number": "1234 5678 9012",
-                "address": None,
-            },
-            "decision": "verify",
-        },
-    )
+    # Verified without copying anything onto the customer.
+    reviewed = ok(desk.review(blurry["id"], "Meena Devi"))
+    assert reviewed["customer_fields_updated"] == []
     assert desk.queue()["jobs_ready_to_resume"] == 1
     assert desk.move(job["id"], "in_progress").status_code == 200
     assert desk.move(job["id"], "submitted").status_code == 200
-    # The customer record was never touched by OCR.
+    # OCR never overwrites the customer record on its own.
     assert db_session.get(Customer, customer["id"]).name == "Meena"
+    assert "customer_updated_from_ocr" not in audit(
+        db_session, "customer", customer["id"]
+    )
 
 
 # ---------- limits ----------
@@ -393,9 +421,9 @@ def test_employee_limits_along_the_way(
     desk = Counter(employee, catalogue["service"])
     customer = desk.new_customer("Asha", "9000022222")["customer"]
     job = desk.open_job(customer["id"])
-    desk.move(job["id"], "in_progress")
+    ok(desk.move(job["id"], "in_progress"))
     aadhaar = desk.upload(job, "AADHAAR", aadhaar_scan(name="Asha"))
-    run_worker(db_session)
+    run_worker(db_session, expect=1)
 
     # A colleague sees none of it.
     colleague = make_client(make_user("employee"))
@@ -436,5 +464,113 @@ def test_employee_limits_along_the_way(
         },
     )
     assert late.status_code == 422
+    assert "closed job" in late.json()["detail"]
     assert desk.review_queue() == []  # closed jobs leave the queue
     assert desk.queue()["jobs_missing_documents"] == 0
+
+
+# ---------- handover ----------
+
+
+def test_job_handed_over_to_a_colleague_mid_flow(
+    client, employee, catalogue, db_session, make_user, make_client, monkeypatch
+):
+    desk = Counter(employee, catalogue["service"])
+    customer = desk.new_customer("Kiran", "9000033333")["customer"]
+    job = desk.open_job(customer["id"])
+    first_id = job["assignees"][0]["id"]
+
+    # Uploaded while OCR is not set up: it waits to be checked by hand.
+    monkeypatch.delenv("OCR_PROVIDER")
+    aadhaar = desk.upload(job, "AADHAAR", aadhaar_scan(name="Kiran"))
+    assert aadhaar["status"] == "uploaded"
+    run_worker(db_session, expect=0)
+    assert desk.review_queue()[0]["review_kind"] == "manual"
+
+    # The first employee goes home; an admin hands the job to a colleague.
+    colleague_user = make_user("employee", name="Sameer Counter")
+    colleague = Counter(make_client(colleague_user), catalogue["service"])
+    ok(
+        client.post(
+            f"{API}/jobs/{job['id']}/assignments", json={"user_id": colleague_user.id}
+        ),
+        201,
+    )
+    ok(client.delete(f"{API}/jobs/{job['id']}/assignments/{first_id}"))
+    assert desk.c.get(f"{API}/jobs/{job['id']}").status_code == 404
+    assert desk.c.get(f"{API}/documents/{aadhaar['id']}/ocr").status_code == 404
+    assert desk.review_queue() == []
+    assert [i["document_id"] for i in colleague.review_queue()] == [aadhaar["id"]]
+
+    # OCR is set up now: the colleague starts it for the waiting document.
+    monkeypatch.setenv("OCR_PROVIDER", "fake")
+    started = ok(colleague.c.post(f"{API}/documents/{aadhaar['id']}/ocr/retry"))
+    assert started["ocr_status"] == "pending"
+    run_worker(db_session, expect=1)
+    assert colleague.review_queue()[0]["review_kind"] == "ocr_check"
+
+    # They look at the scan before confirming; every look is recorded.
+    assert (
+        colleague.c.get(f"{API}/documents/{aadhaar['id']}/preview").status_code == 200
+    )
+    assert (
+        colleague.c.get(f"{API}/documents/{aadhaar['id']}/download").status_code == 200
+    )
+    ok(colleague.review(aadhaar["id"], "Kiran"))
+    trail = db_session.execute(
+        select(AuditLog.action, AuditLog.user_id)
+        .where(AuditLog.entity_type == "document", AuditLog.entity_id == aadhaar["id"])
+        .order_by(AuditLog.id)
+    ).all()
+    by_colleague = [a for a, user_id in trail if user_id == colleague_user.id]
+    assert by_colleague == [
+        "ocr_retried",
+        "document_previewed",
+        "document_downloaded",
+        "ocr_reviewed",
+        "document_verified",
+    ]
+    assert colleague.job(job["id"])["document_progress"]["verified"] == 1
+
+
+# ---------- a shared document turns out wrong ----------
+
+
+def test_rejecting_a_shared_aadhaar_blocks_reuse_but_keeps_earlier_jobs(
+    client, employee, catalogue, db_session
+):
+    desk = Counter(employee, catalogue["service"])
+    customer = desk.new_customer("Lakshmi", "9000044444")["customer"]
+    first = desk.open_job(customer["id"], "First")
+    aadhaar = desk.upload(first, "AADHAAR", aadhaar_scan(name="Lakshmi"))
+    run_worker(db_session, expect=1)
+    ok(desk.review(aadhaar["id"], "Lakshmi"))
+    second = desk.open_job(customer["id"], "Second")
+    link = f"{API}/jobs/{{job}}/checklist/{{item}}/documents"
+    ok(
+        employee.post(
+            link.format(job=second["id"], item=desk.item(second, "AADHAAR")["id"]),
+            json={"document_id": aadhaar["id"]},
+        ),
+        201,
+    )
+
+    # Later the employee notices it belongs to a family member.
+    flagged = ok(
+        employee.post(
+            f"{API}/documents/{aadhaar['id']}/reject",
+            json={"reason": "Belongs to a family member"},
+        )
+    )
+    assert (flagged["status"], flagged["reusable"]) == ("verified", False)
+    for job in (first, second):  # jobs already using it keep it
+        assert desk.job(job["id"])["document_progress"]["verified"] == 1
+
+    third = desk.open_job(customer["id"], "Third")
+    refused = employee.post(
+        link.format(job=third["id"], item=desk.item(third, "AADHAAR")["id"]),
+        json={"document_id": aadhaar["id"]},
+    )
+    assert refused.status_code == 422
+    assert desk.job(third["id"])["document_progress"]["missing"] == 2
+    assert "document_reuse_blocked" in audit(db_session, "document", aadhaar["id"])
