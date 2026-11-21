@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     documents,
     fees,
     jobs,
+    tasks,
     users,
 )
 
@@ -18,3 +19,4 @@ api_router.include_router(fees.router)
 api_router.include_router(customers.router)
 api_router.include_router(catalogue.router)
 api_router.include_router(documents.router)
+api_router.include_router(tasks.router)

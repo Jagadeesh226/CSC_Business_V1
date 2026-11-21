@@ -64,6 +64,21 @@ def document_storage(tmp_path_factory) -> Path:
     return root
 
 
+@pytest.fixture(autouse=True)
+def fake_redis():
+    """Workers' wake-up channel, in memory: tests never touch a real Redis."""
+    import fakeredis
+
+    from app.workers import notifier
+
+    client = fakeredis.FakeRedis()
+    notifier.set_redis_factory(lambda: client)
+    try:
+        yield client
+    finally:
+        notifier.set_redis_factory(None)
+
+
 @pytest.fixture(scope="session")
 def test_engine() -> Iterator[Engine]:
     url = _test_database_url()
