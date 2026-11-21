@@ -43,13 +43,17 @@ def insert_task(
     return existing, False
 
 
+# The lease outlives the handler's time limit, so a slow but alive handler is
+# stopped by its worker before another worker could take the task over.
+LEASE_GRACE_SECONDS = 60
+
 _CLAIM = text(
     """
     UPDATE background_tasks t
     SET status = 'running',
         attempts = t.attempts + 1,
         locked_by = :worker,
-        lease_expires_at = now() + make_interval(secs => t.timeout_seconds),
+        lease_expires_at = now() + make_interval(secs => t.timeout_seconds + :grace),
         updated_at = now()
     WHERE t.id = (
         SELECT id FROM background_tasks
@@ -67,7 +71,9 @@ _CLAIM = text(
 def claim(db: Session, worker: str, task_id: int | None = None):
     """Atomically take one due task (or the given one). SKIP LOCKED means
     concurrent workers never take the same task."""
-    return db.execute(_CLAIM, {"worker": worker, "task_id": task_id}).first()
+    return db.execute(
+        _CLAIM, {"worker": worker, "task_id": task_id, "grace": LEASE_GRACE_SECONDS}
+    ).first()
 
 
 def lock_owned(db: Session, task_id: int, worker: str, attempt: int):

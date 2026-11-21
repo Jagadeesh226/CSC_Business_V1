@@ -45,8 +45,16 @@ def handler():
 
     def run(db, info):
         calls.append(info.id)
-        if "sleep" in behaviour:
-            time.sleep(behaviour["sleep"])
+        gates = behaviour.get("gates")  # per call: an Event to wait on, or None
+        if gates:
+            gate = gates.pop(0)
+            if gate is not None:
+                gate.wait(timeout=30)
+        if "result_per_call" in behaviour:
+            behaviour["result"] = {"call": len(calls)}
+        if "commit" in behaviour:
+            db.add(AuditLog(action="handler_committed", entity_type="test"))
+            db.commit()
         if "write" in behaviour:  # a side effect committed with success
             db.add(
                 AuditLog(action="handler_wrote", entity_type="test", entity_id=info.id)
@@ -205,30 +213,138 @@ def test_missing_handler_fails_permanently(factory, handler):
     assert (row.status, row.last_error) == ("failed", "No handler for this task type.")
 
 
-def test_timeout_discards_late_work(factory, handler):
-    _, behaviour = handler
-    behaviour["sleep"] = 2.0
-    behaviour["write"] = True
-    task_id, _ = enqueue(factory)
+def _set(factory, task_id, **values):
     with factory() as db:
         db.execute(
-            update(BackgroundTask)
-            .where(BackgroundTask.id == task_id)
-            .values(timeout_seconds=1)
+            update(BackgroundTask).where(BackgroundTask.id == task_id).values(**values)
         )
         db.commit()
 
-    Worker(factory, worker_id="w1").run_one()
+
+def test_timeout_discards_late_work(factory, handler):
+    """Deterministic (review L-8): the handler is held until after the
+    timeout has been recorded, then released to try its late commit."""
+    _, behaviour = handler
+    release = threading.Event()
+    behaviour["gates"] = [release]
+    behaviour["write"] = True
+    task_id, _ = enqueue(factory)
+    _set(factory, task_id, timeout_seconds=1)
+    worker = Worker(factory, worker_id="w1")
+
+    worker.run_one()
     row = task(factory, task_id)
     assert (row.status, row.attempts, row.last_error) == ("queued", 1, "Timed out.")
 
-    time.sleep(1.5)  # let the abandoned handler finish and try to commit
+    release.set()
+    worker._abandoned[0].join(timeout=10)
+    assert not worker._abandoned[0].is_alive()
     with factory() as db:
         assert (
             db.scalar(select(AuditLog).where(AuditLog.action == "handler_wrote"))
             is None
         )
     assert task(factory, task_id).status == "queued"
+
+
+def test_stale_attempt_cannot_win_after_admin_retry(factory, handler):
+    """Review M-2: attempts keep counting across retries, so a stale timed-out
+    attempt can never pass for the new one."""
+    from app.services import task_service
+
+    _, behaviour = handler
+    release = threading.Event()
+    behaviour["gates"] = [release, None]  # first call hangs, second is quick
+    behaviour["result_per_call"] = True
+    task_id, _ = enqueue(factory)
+    _set(factory, task_id, timeout_seconds=1, max_attempts=1)
+    worker = Worker(factory, worker_id="w1")
+
+    worker.run_one()  # attempt 1 times out -> failed (no attempts left)
+    assert task(factory, task_id).status == "failed"
+    with factory() as db:
+        admin = User(name="A", email="m2@example.com", password_hash="x", role="admin")
+        db.add(admin)
+        db.flush()
+        task_service.retry_task(db, task_id, admin)
+    row = task(factory, task_id)
+    assert (row.status, row.attempts, row.max_attempts) == ("queued", 1, 4)
+
+    worker.run_one()  # attempt 2, same worker, succeeds
+    release.set()  # now the stale attempt 1 finishes and tries to commit
+    worker._abandoned[0].join(timeout=10)
+    row = task(factory, task_id)
+    assert (row.status, row.attempts, row.result) == ("succeeded", 2, {"call": 2})
+
+
+def test_handlers_cannot_commit(factory, handler):
+    """Review M-4: a handler commit would skip the ownership check."""
+    _, behaviour = handler
+    behaviour["commit"] = True
+    task_id, _ = enqueue(factory)
+    Worker(factory, worker_id="w1").run_one()
+    row = task(factory, task_id)
+    assert row.last_error == "Unexpected error (RuntimeError)."
+    with factory() as db:
+        assert (
+            db.scalar(select(AuditLog).where(AuditLog.action == "handler_committed"))
+            is None
+        )
+
+
+def test_lease_outlives_the_time_limit(factory, handler):
+    """Review L-7: no second worker takes over a slow but alive handler."""
+    from app.repositories.task_repository import LEASE_GRACE_SECONDS
+
+    task_id, _ = enqueue(factory)
+    with factory() as db:
+        task_repository.claim(db, "w1")
+        db.commit()
+    row = task(factory, task_id)
+    lease = (row.lease_expires_at - row.updated_at).total_seconds()
+    assert lease == pytest.approx(row.timeout_seconds + LEASE_GRACE_SECONDS, abs=1)
+
+
+def test_worker_keeps_running_through_database_errors(factory):
+    """Review H-1: a database outage is retried, not fatal."""
+    from sqlalchemy.exc import OperationalError
+
+    worker = Worker(factory, worker_id="w1", poll_interval=0.01)
+    ticks = []
+
+    def flaky_tick():
+        ticks.append(1)
+        if len(ticks) <= 2:
+            raise OperationalError("SELECT 1", {}, Exception("database restarting"))
+        worker.stop()
+        return 0
+
+    worker.tick = flaky_tick
+    worker._wait_for_wakeup = lambda: None
+    thread = threading.Thread(target=worker.run_forever, daemon=True)
+    thread.start()
+    thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert len(ticks) == 3  # survived two failures
+
+
+def test_too_many_hung_handlers_pause_claiming(factory, handler):
+    from app.workers.worker import MAX_ABANDONED_HANDLERS
+
+    enqueue(factory)
+    worker = Worker(factory, worker_id="w1")
+    hold = threading.Event()
+    worker._abandoned = [
+        threading.Thread(target=hold.wait, daemon=True)
+        for _ in range(MAX_ABANDONED_HANDLERS)
+    ]
+    for t in worker._abandoned:
+        t.start()
+    assert worker.tick() == 0  # paused: nothing claimed
+    hold.set()
+    for t in worker._abandoned:
+        t.join(timeout=5)
+    assert worker.tick() == 1
 
 
 def test_expired_lease_is_requeued_or_failed(factory, handler):
@@ -377,7 +493,8 @@ def test_admin_lists_views_and_retries_failed_tasks(
 
     retried = admin.post(f"{API}/{task_id}/retry")
     assert retried.status_code == 200
-    assert (retried.json()["status"], retried.json()["attempts"]) == ("queued", 0)
+    body = retried.json()
+    assert (body["status"], body["attempts"], body["max_attempts"]) == ("queued", 1, 4)
     assert task_id in stream_ids(fake_redis)  # workers woken
     with factory() as db:
         entry = db.scalar(select(AuditLog).where(AuditLog.action == "task_retried"))
@@ -399,3 +516,59 @@ def test_task_api_is_admin_only(admin_client):
 )
 def test_task_list_validation(admin_client, params):
     assert admin_client["admin"].get(API, params=params).status_code == 422
+
+
+# ---------- review fixes: Redis and notifications ----------
+
+
+def test_idle_redis_read_is_not_an_outage(factory):
+    """Review M-3: a blocking read that simply times out means "no message"."""
+
+    class IdleRedis:
+        def xgroup_create(self, *a, **k):
+            return True
+
+        def xreadgroup(self, *a, **k):
+            raise redis.TimeoutError("read timed out")
+
+    worker = Worker(factory, worker_id="w1", poll_interval=5, redis_client=IdleRedis())
+    started = time.monotonic()
+    worker._wait_for_wakeup()
+    assert time.monotonic() - started < 1  # no extra sleep, no "unavailable"
+
+
+def test_savepoint_release_does_not_publish(factory, handler, fake_redis):
+    """Review L-1: only the outermost commit wakes workers."""
+    with factory() as db:
+        nested = db.begin_nested()
+        task_queue.enqueue(db, TASK, "doc:5:v1", {"document_id": 5})
+        nested.commit()
+        assert stream_ids(fake_redis) == []
+        db.commit()
+    assert len(stream_ids(fake_redis)) == 1
+
+
+def test_malformed_redis_url_does_not_break_commit(factory, handler, monkeypatch):
+    """Review L-2."""
+    notifier.set_redis_factory(None)
+    monkeypatch.setenv("REDIS_URL", "not a url")
+    task_id, created = enqueue(factory)
+    assert created and task(factory, task_id).status == "queued"
+
+
+def test_limits_do_not_depend_on_handler_registration(factory):
+    """Review L-6: the API enqueues without importing handlers."""
+    registry.unregister(TASK)
+    task_id, _ = enqueue(factory)
+    row = task(factory, task_id)
+    assert (row.timeout_seconds, row.max_attempts) == registry.limits_for(TASK)
+
+
+def test_outer_rollback_after_savepoint_publishes_nothing(factory, handler, fake_redis):
+    """Review L-1: a released savepoint followed by an outer rollback."""
+    with factory() as db:
+        nested = db.begin_nested()
+        task_queue.enqueue(db, TASK, "doc:6:v1", {"document_id": 6})
+        nested.commit()
+        db.rollback()
+    assert stream_ids(fake_redis) == []

@@ -54,7 +54,7 @@ class BackgroundTask(Base):
     )
     # Only ids and settings: never document contents or personal data.
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
     timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False)

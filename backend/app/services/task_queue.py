@@ -28,18 +28,22 @@ def enqueue(
     """Queue a task once per idempotency key. Returns (task id, created).
 
     Enqueueing the same key again (a retried request, a duplicate click)
-    returns the existing task instead of creating a second one.
+    returns the existing task, whatever its status, and ignores the new
+    payload. Keys must therefore name one piece of work exactly, e.g.
+    "document_ocr:<document id>:v<version>"; to run work again, use a new
+    key or an admin retry.
     """
     if task_type not in TASK_TYPES:
         raise ValueError(f"Unknown task type: {task_type}")
     spec = registry.get_spec(task_type)
+    timeout, attempts = registry.limits_for(task_type)
     task_id, created = repo.insert_task(
         db,
         task_type=task_type,
         idempotency_key=idempotency_key,
         payload=payload,
-        max_attempts=spec.max_attempts if spec else 3,
-        timeout_seconds=spec.timeout_seconds if spec else 120,
+        max_attempts=spec.max_attempts if spec else attempts,
+        timeout_seconds=spec.timeout_seconds if spec else timeout,
         created_by=created_by,
     )
     if created:
@@ -52,12 +56,27 @@ def notify_after_commit(db: Session, task_ids: list[int]) -> None:
     db.info.setdefault(_PENDING, []).extend(task_ids)
 
 
+_COMMITTED = "task_queue_committed"
+
+
+# SQLAlchemy fires after_commit both for a real commit and for releasing a
+# savepoint, and the two look the same there. after_transaction_end tells
+# them apart, so: note the commit, then publish only when the outermost
+# transaction ends after a commit. A savepoint release, or an outer rollback
+# after one, publishes nothing.
 @event.listens_for(Session, "after_commit")
-def _publish_pending(session: Session) -> None:
-    notifier.publish(session.info.pop(_PENDING, []))
+def _note_commit(session: Session) -> None:
+    session.info[_COMMITTED] = True
 
 
-@event.listens_for(Session, "after_soft_rollback")
-def _drop_pending(session: Session, previous_transaction) -> None:
-    if previous_transaction.parent is None:  # the outermost transaction
-        session.info.pop(_PENDING, None)
+@event.listens_for(Session, "after_transaction_end")
+def _publish_or_drop(session: Session, transaction) -> None:
+    if transaction.nested:
+        session.info.pop(_COMMITTED, None)  # that commit was a savepoint
+        return
+    if transaction.parent is not None:
+        return
+    committed = session.info.pop(_COMMITTED, False)
+    pending = session.info.pop(_PENDING, [])
+    if committed:
+        notifier.publish(pending)

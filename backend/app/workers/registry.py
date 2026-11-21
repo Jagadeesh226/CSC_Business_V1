@@ -1,9 +1,11 @@
 """Task handlers, registered by task type.
 
 A handler receives a database session and a ``TaskInfo`` and returns a small
-JSON-able result (ids, counts; never document contents). It must not commit:
-the worker commits the handler's changes together with the task's success,
-and only if the task is still owned by this attempt.
+JSON-able result (ids, counts; never document contents or identity numbers:
+results are shown to admins). It cannot commit (its session refuses): the
+worker commits the handler's changes together with the task's success, and
+only if this claim still owns the task. Handlers must be idempotent, since a
+task can run more than once (a crashed worker's task is retried).
 
 Raise ``TaskError`` with a safe message for an expected, retryable failure,
 or ``PermanentTaskError`` when retrying cannot help.
@@ -42,17 +44,34 @@ class TaskSpec:
     max_attempts: int = 3
 
 
+# Limits per task type, known to every process (the API enqueues tasks
+# without importing handlers, so limits must not depend on registration).
+TASK_LIMITS: dict[str, tuple[int, int]] = {
+    # task type: (timeout seconds, max attempts)
+    "document_ocr": (180, 3),
+    "vehicle_expiry_lookup": (120, 3),
+    "vehicle_mobile_lookup": (120, 3),
+}
+DEFAULT_LIMITS = (120, 3)
+
 _REGISTRY: dict[str, TaskSpec] = {}
+
+
+def limits_for(task_type: str) -> tuple[int, int]:
+    return TASK_LIMITS.get(task_type, DEFAULT_LIMITS)
 
 
 def register(
     task_type: str,
     handler: Handler,
     *,
-    timeout_seconds: int = 120,
-    max_attempts: int = 3,
+    timeout_seconds: int | None = None,
+    max_attempts: int | None = None,
 ) -> None:
-    _REGISTRY[task_type] = TaskSpec(handler, timeout_seconds, max_attempts)
+    default_timeout, default_attempts = limits_for(task_type)
+    _REGISTRY[task_type] = TaskSpec(
+        handler, timeout_seconds or default_timeout, max_attempts or default_attempts
+    )
 
 
 def unregister(task_type: str) -> None:

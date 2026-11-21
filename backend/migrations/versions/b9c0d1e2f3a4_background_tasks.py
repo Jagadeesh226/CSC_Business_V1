@@ -84,14 +84,9 @@ def upgrade() -> None:
         ["status", "run_after"],
         unique=False,
     )
-    op.create_index(
-        op.f("ix_background_tasks_status"), "background_tasks", ["status"], unique=False
-    )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(op.f("ix_background_tasks_status"), table_name="background_tasks")
     op.drop_index("ix_background_tasks_due", table_name="background_tasks")
     op.drop_table("background_tasks")
-    # ### end Alembic commands ###
