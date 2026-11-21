@@ -1045,6 +1045,50 @@
         "title": "DocumentDetail",
         "type": "object"
       },
+      "DocumentProgress": {
+        "description": "Required checklist documents of the job, by state.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "processing": {
+            "title": "Processing",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "required_total": {
+            "title": "Required Total",
+            "type": "integer"
+          },
+          "to_review": {
+            "title": "To Review",
+            "type": "integer"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "required_total",
+          "verified",
+          "to_review",
+          "processing",
+          "rejected",
+          "missing",
+          "complete"
+        ],
+        "title": "DocumentProgress",
+        "type": "object"
+      },
       "DocumentRead": {
         "properties": {
           "archive_reason": {
@@ -1523,6 +1567,15 @@
         "title": "DocumentVersionRead",
         "type": "object"
       },
+      "DueFilter": {
+        "description": "Open jobs by due date, in the centre's calendar (Asia/Kolkata).",
+        "enum": [
+          "overdue",
+          "today"
+        ],
+        "title": "DueFilter",
+        "type": "string"
+      },
       "ErrorResponse": {
         "properties": {
           "detail": {
@@ -1898,6 +1951,16 @@
             ],
             "title": "Description"
           },
+          "document_progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "due_date": {
             "anyOf": [
               {
@@ -1953,6 +2016,14 @@
         ],
         "title": "JobRead",
         "type": "object"
+      },
+      "JobSort": {
+        "enum": [
+          "newest",
+          "urgency"
+        ],
+        "title": "JobSort",
+        "type": "string"
       },
       "JobStatus": {
         "description": "Job statuses approved in docs/contracts/decisions.md section 7.",
@@ -2361,6 +2432,18 @@
         "title": "PasswordReset",
         "type": "object"
       },
+      "Readiness": {
+        "description": "Job list filter by document progress. Only jobs still gathering\ndocuments (pending, in progress, waiting for documents) match.",
+        "enum": [
+          "missing_documents",
+          "needs_review",
+          "processing",
+          "ready_to_submit",
+          "ready_to_resume"
+        ],
+        "title": "Readiness",
+        "type": "string"
+      },
       "RejectRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2549,6 +2632,151 @@
         ],
         "title": "ReviewDecision",
         "type": "string"
+      },
+      "ReviewJobRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "job_number": {
+            "title": "Job Number",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_number",
+          "title",
+          "status"
+        ],
+        "title": "ReviewJobRef",
+        "type": "object"
+      },
+      "ReviewKind": {
+        "enum": [
+          "ocr_check",
+          "ocr_failed",
+          "manual"
+        ],
+        "title": "ReviewKind",
+        "type": "string"
+      },
+      "ReviewQueueItem": {
+        "properties": {
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/CustomerRef"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "integer"
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentTypeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "flagged_fields": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flagged Fields"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewJobRef"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "review_kind": {
+            "$ref": "#/components/schemas/ReviewKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
+          "waiting_since": {
+            "format": "date-time",
+            "title": "Waiting Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "filename",
+          "status",
+          "current_version",
+          "document_type",
+          "customer",
+          "jobs",
+          "review_kind",
+          "flagged_fields",
+          "waiting_since"
+        ],
+        "title": "ReviewQueueItem",
+        "type": "object"
+      },
+      "ReviewQueueResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewQueueItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "ReviewQueueResponse",
+        "type": "object"
       },
       "Sensitivity": {
         "enum": [
@@ -3294,6 +3522,68 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkQueueSummary": {
+        "description": "What the signed-in user has to do next. Employees count only open\njobs they are assigned to; admins count every open job.",
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "documents_to_review": {
+            "title": "Documents To Review",
+            "type": "integer"
+          },
+          "jobs_due_today": {
+            "title": "Jobs Due Today",
+            "type": "integer"
+          },
+          "jobs_missing_documents": {
+            "title": "Jobs Missing Documents",
+            "type": "integer"
+          },
+          "jobs_overdue": {
+            "title": "Jobs Overdue",
+            "type": "integer"
+          },
+          "jobs_processing": {
+            "title": "Jobs Processing",
+            "type": "integer"
+          },
+          "jobs_ready_to_resume": {
+            "title": "Jobs Ready To Resume",
+            "type": "integer"
+          },
+          "jobs_ready_to_submit": {
+            "title": "Jobs Ready To Submit",
+            "type": "integer"
+          },
+          "unassigned_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unassigned Jobs"
+          }
+        },
+        "required": [
+          "as_of",
+          "documents_to_review",
+          "jobs_missing_documents",
+          "jobs_processing",
+          "jobs_ready_to_submit",
+          "jobs_ready_to_resume",
+          "jobs_overdue",
+          "jobs_due_today",
+          "unassigned_jobs"
+        ],
+        "title": "WorkQueueSummary",
         "type": "object"
       }
     }
@@ -5331,6 +5621,63 @@
               "description": "A user id, or 'me' for the signed-in user",
               "title": "Assigned To"
             }
+          },
+          {
+            "description": "Document progress (jobs still gathering documents)",
+            "in": "query",
+            "name": "readiness",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Readiness"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Document progress (jobs still gathering documents)",
+              "title": "Readiness"
+            }
+          },
+          {
+            "description": "Open jobs overdue or due today (centre's calendar)",
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DueFilter"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Open jobs overdue or due today (centre's calendar)",
+              "title": "Due"
+            }
+          },
+          {
+            "description": "Open jobs nobody is assigned to (admins)",
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Open jobs nobody is assigned to (admins)",
+              "title": "Unassigned",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/JobSort",
+              "default": "newest"
+            }
           }
         ],
         "responses": {
@@ -6688,6 +7035,119 @@
         "summary": "List Status History",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/review-queue": {
+      "get": {
+        "operationId": "review_queue_api_v1_review_queue_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewQueueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Queue",
+        "tags": [
+          "queues"
         ]
       }
     },
@@ -8432,6 +8892,47 @@
         "summary": "Reset Password",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/v1/work-queue": {
+      "get": {
+        "operationId": "work_queue_api_v1_work_queue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkQueueSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          }
+        },
+        "summary": "Work Queue",
+        "tags": [
+          "queues"
         ]
       }
     },
