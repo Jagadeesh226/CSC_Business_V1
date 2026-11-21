@@ -2,8 +2,11 @@ from app.models.audit_log import AuditLog
 from app.models.customer import Customer
 from app.models.document import Document
 from app.models.document_type import DocumentType
+from app.models.document_version import DocumentVersion
 from app.models.job import Job
 from app.models.job_assignment import JobAssignment
+from app.models.job_checklist_item import JobChecklistItem
+from app.models.job_document import JobDocument
 from app.models.job_fee import JobFee
 from app.models.job_status_history import JobStatusHistory
 from app.models.payment import Payment
@@ -20,8 +23,11 @@ __all__ = [
     "Customer",
     "Document",
     "DocumentType",
+    "DocumentVersion",
     "Job",
     "JobAssignment",
+    "JobChecklistItem",
+    "JobDocument",
     "JobFee",
     "JobStatusHistory",
     "Payment",

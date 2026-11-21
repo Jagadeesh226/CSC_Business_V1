@@ -150,6 +150,9 @@ class StatusChangeRequest(BaseModel):
 
     status: JobStatus
     reason: Reason | None = None
+    # Admins only: submit although required documents are not all verified.
+    # Needs a reason, and is audited.
+    override_document_check: bool = False
 
 
 class CancelRequest(BaseModel):

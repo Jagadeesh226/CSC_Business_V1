@@ -23,8 +23,13 @@ from app.schemas.job import (
     StatusHistoryRead,
 )
 from app.schemas.user import UserRole
-from app.services import audit_service, fee_service
-from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
+from app.services import audit_service, document_service, fee_service
+from app.services.errors import (
+    BusinessRuleError,
+    ConflictError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 
 JOB_NUMBER_SEQUENCE = "job_number"
 JOB_NUMBER_PREFIX = "CSC"
@@ -67,7 +72,14 @@ def _to_read(row: JobRow, assignees: list[User]) -> JobRead:
         created_by=job.created_by,
         created_at=job.created_at,
         customer=CustomerRef.model_validate(customer),
-        service=ServiceRef.model_validate(service) if service is not None else None,
+        # The name the service had when the job was created (owner decision).
+        service=ServiceRef(
+            id=service.id,
+            name=job.service_name or service.name,
+            code=service.code,
+        )
+        if service is not None
+        else None,
         assignees=[AssigneeRef.model_validate(u) for u in assignees],
         allowed_next_statuses=list(STATUS_TRANSITIONS.get(job.status, ())),
     )
@@ -120,6 +132,7 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
                     job_number=format_job_number(year, value),
                     customer_id=data.customer_id,
                     service_id=data.service_id,
+                    service_name=service.name,
                     title=data.title,
                     description=data.description,
                     due_date=data.due_date,
@@ -146,6 +159,8 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
                 details={"job_number": job.job_number},
             )
             fee_service.add_default_service_fee(db, job.id, service, created_by)
+            # The job's document checklist, frozen from the service today.
+            document_service.create_checklist(db, job, service.id)
             if creator is not None and not is_admin(creator):
                 _assign(db, job.id, creator, actor=creator, reason="creator")
             db.commit()
@@ -381,6 +396,7 @@ def change_status(
     new_status: JobStatus,
     actor: User,
     reason: str | None = None,
+    override_document_check: bool = False,
 ) -> JobRead:
     """Move a job to its next status. Admins: any job; employees: assigned.
 
@@ -399,9 +415,47 @@ def change_status(
             raise BusinessRuleError(f"A {job.status} job cannot change status.")
         options = ", ".join(s.value for s in allowed)
         raise BusinessRuleError(f"A {job.status} job can only move to: {options}.")
+    if new_status == JobStatus.SUBMITTED:
+        _check_documents_before_submit(db, job, actor, reason, override_document_check)
     _record_status_change(db, job, new_status.value, actor, reason)
     db.commit()
     return get_job(db, job_id)
+
+
+def _check_documents_before_submit(
+    db: Session, job: Job, actor: User, reason: str | None, override: bool
+) -> None:
+    """Owner decision: a job is submitted only when every required checklist
+    document is verified. Admins may override, with a reason, and it is
+    audited. Runs under the job lock, which document writes also take."""
+    checklist = document_service.build_checklist(db, job.id)
+    missing = [
+        i.document_type_name
+        for i in checklist.items
+        if i.is_required and i.state != "verified"
+    ]
+    if not missing:
+        if override:
+            raise BusinessRuleError(
+                "No override is needed: all documents are verified."
+            )
+        return
+    if not override:
+        raise BusinessRuleError(
+            "Required documents are not verified yet: " + ", ".join(missing) + "."
+        )
+    if not is_admin(actor):
+        raise PermissionDeniedError("Only an admin can override the document check.")
+    if not reason:
+        raise BusinessRuleError("Overriding the document check needs a reason.")
+    audit_service.record(
+        db,
+        action="document_check_overridden",
+        entity_type="job",
+        entity_id=job.id,
+        user_id=actor.id,
+        details={"missing": missing, "reason": reason},
+    )
 
 
 def cancel_job(db: Session, job_id: int, actor: User, reason: str) -> JobRead:
