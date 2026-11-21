@@ -5,6 +5,9 @@ from sqlalchemy import (
     ColumnElement,
     DateTime,
     Row,
+    Select,
+    Subquery,
+    and_,
     cast,
     exists,
     func,
@@ -26,6 +29,8 @@ from app.models import (
     ServiceCategory,
     User,
 )
+from app.repositories import readiness_repository as readiness_repo
+from app.schemas.job import DOCUMENT_STAGES, FINAL_STATUSES
 
 JobRow = Row[tuple[Job, Customer, Service | None]]
 
@@ -140,11 +145,8 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def list_jobs(
-    db: Session,
+def _job_filters(
     *,
-    offset: int,
-    limit: int,
     search: str | None = None,
     customer_id: int | None = None,
     service_id: int | None = None,
@@ -152,10 +154,11 @@ def list_jobs(
     due_date: date | None = None,
     assigned_to: int | None = None,
     visible_to: int | None = None,
-) -> tuple[list[JobRow], int]:
-    """``visible_to`` limits results to jobs that user is actively assigned to
-    (employee access); ``assigned_to`` is the same condition used as a filter.
-    """
+    readiness: str | None = None,
+    due: str | None = None,
+    today: date | None = None,
+    unassigned: bool = False,
+) -> tuple[list[ColumnElement[bool]], Subquery | None]:
     conditions: list[ColumnElement[bool]] = []
     if search:
         pattern = f"%{_escape_like(search)}%"
@@ -175,16 +178,84 @@ def list_jobs(
         conditions.append(Job.due_date == due_date)
     for user_id in {u for u in (assigned_to, visible_to) if u is not None}:
         conditions.append(_actively_assigned(user_id))
+    progress = None
+    if readiness is not None:
+        progress = readiness_repo.progress_subquery()
+        conditions.append(readiness_condition(progress, readiness))
+    if due is not None:
+        if today is None:
+            raise ValueError("The due filter needs today's business date.")
+        conditions.append(Job.status.not_in(FINAL_STATUSES))
+        conditions.append(
+            Job.due_date < today if due == "overdue" else Job.due_date == today
+        )
+    if unassigned:
+        conditions.append(Job.status.not_in(FINAL_STATUSES))
+        conditions.append(
+            ~exists().where(
+                JobAssignment.job_id == Job.id, JobAssignment.unassigned_at.is_(None)
+            )
+        )
+    return conditions, progress
 
-    total = db.scalar(select(func.count()).select_from(Job).where(*conditions))
+
+def _count(conditions, progress: Subquery | None) -> Select:
+    stmt = select(func.count()).select_from(Job)
+    if progress is not None:
+        stmt = stmt.outerjoin(progress, progress.c.job_id == Job.id)
+    return stmt.where(*conditions)
+
+
+def count_jobs(db: Session, **filters) -> int:
+    """Number of jobs matching the same filters as ``list_jobs``."""
+    return int(db.scalar(_count(*_job_filters(**filters))) or 0)
+
+
+def list_jobs(
+    db: Session, *, offset: int, limit: int, sort: str = "newest", **filters
+) -> tuple[list[JobRow], int]:
+    """Filters (see ``_job_filters``): ``visible_to`` limits results to jobs
+    that user is actively assigned to (employee access); ``assigned_to`` is
+    the same condition used as a filter; ``due`` needs ``today`` (the
+    business date).
+    """
+    conditions, progress = _job_filters(**filters)
+    rows_stmt = _with_relations()
+    if progress is not None:
+        rows_stmt = rows_stmt.outerjoin(progress, progress.c.job_id == Job.id)
+    if sort == "urgency":
+        order = (Job.due_date.asc().nulls_last(), Job.created_at, Job.id)
+    else:
+        order = (Job.created_at.desc(), Job.id.desc())
+    total = db.scalar(_count(conditions, progress))
     rows = db.execute(
-        _with_relations()
-        .where(*conditions)
-        .order_by(Job.created_at.desc(), Job.id.desc())
-        .offset(offset)
-        .limit(limit)
+        rows_stmt.where(*conditions).order_by(*order).offset(offset).limit(limit)
     ).all()
     return list(rows), int(total or 0)
+
+
+def readiness_condition(progress: Subquery, readiness: str) -> ColumnElement[bool]:
+    """Jobs still gathering documents whose progress matches ``readiness``
+    (see ``app.schemas.job.Readiness``)."""
+
+    def col(name: str) -> ColumnElement[int]:
+        return readiness_repo.column(progress, name)
+
+    complete = readiness_repo.is_complete(progress)
+    match readiness:
+        case "missing_documents":
+            cond = (col("missing") + col("rejected")) > 0
+        case "needs_review":
+            cond = col("to_review") > 0
+        case "processing":
+            cond = col("processing") > 0
+        case "ready_to_submit":
+            return and_(Job.status == "in_progress", complete)
+        case "ready_to_resume":
+            return and_(Job.status == "waiting_for_documents", complete)
+        case _:
+            raise ValueError(f"Unknown readiness {readiness!r}")
+    return and_(Job.status.in_(DOCUMENT_STAGES), cond)
 
 
 # ---------- assignments ----------

@@ -78,6 +78,51 @@ class JobUpdate(BaseModel):
         return self
 
 
+# Statuses in which a job is still gathering documents (before submission).
+DOCUMENT_STAGES = (
+    JobStatus.PENDING.value,
+    JobStatus.IN_PROGRESS.value,
+    JobStatus.WAITING_FOR_DOCUMENTS.value,
+)
+
+
+class Readiness(StrEnum):
+    """Job list filter by document progress. Only jobs still gathering
+    documents (pending, in progress, waiting for documents) match."""
+
+    MISSING_DOCUMENTS = "missing_documents"  # a required one is missing or rejected
+    NEEDS_REVIEW = "needs_review"  # a document waits for a person to check it
+    PROCESSING = "processing"  # OCR is still reading a document
+    READY_TO_SUBMIT = "ready_to_submit"  # in progress, every required one verified
+    READY_TO_RESUME = "ready_to_resume"  # waiting for documents, now all verified
+
+
+class DueFilter(StrEnum):
+    """Open jobs by due date, in the centre's calendar (Asia/Kolkata)."""
+
+    OVERDUE = "overdue"
+    TODAY = "today"
+
+
+class JobSort(StrEnum):
+    NEWEST = "newest"  # newest first (default)
+    URGENCY = "urgency"  # earliest due date first, then oldest; no date last
+
+
+class DocumentProgress(BaseModel):
+    """Required checklist documents of the job, by state."""
+
+    required_total: int
+    verified: int
+    to_review: int
+    processing: int
+    rejected: int
+    missing: int
+    # Every required document is verified (same as the checklist's
+    # ``complete``): the job may be submitted.
+    complete: bool
+
+
 class CustomerRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -120,6 +165,8 @@ class JobRead(BaseModel):
     # Statuses the job can move to next with POST /jobs/{id}/status.
     # Cancelling (admins only) is separate and possible while not final.
     allowed_next_statuses: list[JobStatus]
+    # Always returned; optional only so older clients' schemas stay valid.
+    document_progress: DocumentProgress | None = None
 
 
 class JobListResponse(BaseModel):

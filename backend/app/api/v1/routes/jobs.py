@@ -12,11 +12,14 @@ from app.schemas.job import (
     AssignmentCreate,
     AssignmentRead,
     CancelRequest,
+    DueFilter,
     JobCreate,
     JobListResponse,
     JobRead,
+    JobSort,
     JobStatus,
     JobUpdate,
+    Readiness,
     StatusChangeRequest,
     StatusHistoryRead,
 )
@@ -101,6 +104,19 @@ def list_jobs(
             description="A user id, or 'me' for the signed-in user",
         ),
     ] = None,
+    readiness: Annotated[
+        Readiness | None,
+        Query(description="Document progress (jobs still gathering documents)"),
+    ] = None,
+    due: Annotated[
+        DueFilter | None,
+        Query(description="Open jobs overdue or due today (centre's calendar)"),
+    ] = None,
+    unassigned: Annotated[
+        bool,
+        Query(description="Open jobs nobody is assigned to (admins)"),
+    ] = False,
+    sort: JobSort = JobSort.NEWEST,
 ) -> JobListResponse:
     assignee_id = _parse_assigned_to(assigned_to, user)
     return job_service.list_jobs(
@@ -114,6 +130,10 @@ def list_jobs(
         service_id=service_id,
         status=status,
         due_date=due_date,
+        readiness=readiness,
+        due=due,
+        unassigned=unassigned,
+        sort=sort,
     )
 
 
