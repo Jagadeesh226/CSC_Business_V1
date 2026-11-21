@@ -1,7 +1,15 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +26,10 @@ class Receipt(Base):
     """
 
     __tablename__ = "receipts"
+    __table_args__ = (
+        UniqueConstraint("receipt_number", name="uq_receipts_receipt_number"),
+        UniqueConstraint("payment_id", name="uq_receipts_payment_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     receipt_number: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)

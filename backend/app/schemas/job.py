@@ -219,8 +219,3 @@ class StatusHistoryRead(BaseModel):
     changed_by: AssigneeRef | None
     reason: str | None
     changed_at: datetime
-
-
-from app.schemas.payment import PaymentSummary
-
-JobRead.model_rebuild()

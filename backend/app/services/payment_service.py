@@ -21,6 +21,7 @@ payment.
 
 import hashlib
 import json
+import logging
 from datetime import datetime
 from decimal import Decimal
 
@@ -47,12 +48,14 @@ from app.services import audit_service, job_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.services.payment_summary import summarize
 
+log = logging.getLogger("app.payments")
+
 PAYMENT_NOT_FOUND = "Payment not found."
 RECEIPT_SEQUENCE = "receipt_number"
 RECEIPT_PREFIX = "RCP"
 KEY_REUSED = (
-    "This Idempotency-Key was already used for a different payment. "
-    "Use a new key for a new payment."
+    "This Idempotency-Key was already used for a different payment request. "
+    "Use a new key for each new payment."
 )
 
 
@@ -199,17 +202,65 @@ def _snapshot(
     }
 
 
+def _constraint(exc: IntegrityError) -> str | None:
+    return getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+
+
 def record_payment(
     db: Session, job_id: int, data: PaymentCreate, key: str, actor: User
 ) -> PaymentRecorded:
+    # The job and access come first, so a key never reveals anything about
+    # a job the person cannot see.
+    if job_repository.get_job(db, job_id) is None:
+        raise NotFoundError(job_service.JOB_NOT_FOUND)
+    job_service.ensure_job_access(db, job_id, actor)
     fingerprint = request_hash(job_id, data, actor.id)
     existing = repo.get_by_key(db, key)
     if existing is not None:
         return _replay(db, existing, job_id, fingerprint, actor)
 
+    for attempt in range(2):
+        try:
+            return _record(db, job_id, data, key, fingerprint, actor)
+        except IntegrityError as exc:
+            db.rollback()
+            constraint = _constraint(exc)
+            if constraint == "uq_payments_idempotency_key":
+                # The same key was used at the same moment on another job.
+                existing = repo.get_by_key(db, key)
+                if existing is not None:
+                    return _replay(db, existing, job_id, fingerprint, actor)
+            elif constraint == "uq_receipts_receipt_number" and attempt == 0:
+                # The counter is behind existing receipts (restored data, a
+                # lost counter row): move it past them and try once more.
+                log.warning("Receipt counter was behind; moving it forward.")
+                year = job_repository.current_year(db, job_service.BUSINESS_TIMEZONE)
+                job_repository.sync_sequence_to_existing_numbers(
+                    db,
+                    RECEIPT_SEQUENCE,
+                    year,
+                    f"{RECEIPT_PREFIX}-{year}-",
+                    Receipt.receipt_number,
+                )
+                db.commit()
+                continue
+            log.error("Payment could not be recorded (constraint %s).", constraint)
+            raise
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _record(
+    db: Session,
+    job_id: int,
+    data: PaymentCreate,
+    key: str,
+    fingerprint: str,
+    actor: User,
+) -> PaymentRecorded:
     job = job_repository.get_job_for_update(db, job_id)
     if job is None:
         raise NotFoundError(job_service.JOB_NOT_FOUND)
+    # Again under the lock: assignment changes take the same lock.
     job_service.ensure_job_access(db, job_id, actor)
     # A racing repeat on this job committed while we waited for the lock.
     existing = repo.get_by_key(db, key)
@@ -227,59 +278,49 @@ def record_payment(
             f"The amount is more than the balance due (Rs {_money(balance)})."
         )
 
-    try:
-        payment = repo.add(
-            db,
-            Payment(
-                job_id=job_id,
-                amount=data.amount,
-                payment_method=data.method.value,
-                reference_number=data.reference_number,
-                notes=data.notes,
-                status=PaymentStatus.RECEIVED.value,
-                recorded_by=actor.id,
-                idempotency_key=key,
-                request_hash=fingerprint,
-            ),
-        )
-        year = job_repository.current_year(db, job_service.BUSINESS_TIMEZONE)
-        number = format_receipt_number(
-            year, job_repository.next_sequence_value(db, RECEIPT_SEQUENCE, year)
-        )
-        receipt = repo.add(
-            db,
-            Receipt(
-                receipt_number=number,
-                payment_id=payment.id,
-                job_id=job_id,
-                customer_id=job.customer_id,
-                issued_by=actor.id,
-                snapshot=_snapshot(db, job, payment, paid, actor),
-            ),
-        )
-        audit_service.record(
-            db,
-            action="payment_recorded",
-            entity_type="job",
-            entity_id=job_id,
-            user_id=actor.id,
-            details={
-                "payment_id": payment.id,
-                "receipt_number": receipt.receipt_number,
-                "amount": _money(payment.amount),
-                "method": payment.payment_method,
-            },
-        )
-        db.commit()
-    except IntegrityError:
-        # The same key was used concurrently on another job.
-        db.rollback()
-        existing = repo.get_by_key(db, key)
-        if existing is not None:
-            return _replay(db, existing, job_id, fingerprint, actor)
-        raise ConflictError(
-            "The payment could not be recorded. Please retry."
-        ) from None
+    payment = repo.add(
+        db,
+        Payment(
+            job_id=job_id,
+            amount=data.amount,
+            payment_method=data.method.value,
+            reference_number=data.reference_number,
+            notes=data.notes,
+            status=PaymentStatus.RECEIVED.value,
+            recorded_by=actor.id,
+            idempotency_key=key,
+            request_hash=fingerprint,
+        ),
+    )
+    year = job_repository.current_year(db, job_service.BUSINESS_TIMEZONE)
+    number = format_receipt_number(
+        year, job_repository.next_sequence_value(db, RECEIPT_SEQUENCE, year)
+    )
+    receipt = repo.add(
+        db,
+        Receipt(
+            receipt_number=number,
+            payment_id=payment.id,
+            job_id=job_id,
+            customer_id=job.customer_id,
+            issued_by=actor.id,
+            snapshot=_snapshot(db, job, payment, paid, actor),
+        ),
+    )
+    audit_service.record(
+        db,
+        action="payment_recorded",
+        entity_type="job",
+        entity_id=job_id,
+        user_id=actor.id,
+        details={
+            "payment_id": payment.id,
+            "receipt_number": receipt.receipt_number,
+            "amount": _money(payment.amount),
+            "method": payment.payment_method,
+        },
+    )
+    db.commit()
     return _recorded(db, payment, replayed=False)
 
 
@@ -300,7 +341,7 @@ def void_payment(
     job_repository.get_job_for_update(db, payment.job_id)
     payment = repo.lock(db, payment_id)
     if payment.status == PaymentStatus.VOIDED.value:
-        raise BusinessRuleError("The payment is already voided.")
+        raise ConflictError("The payment is already voided.")
     now = _now(db)
     payment.status = PaymentStatus.VOIDED.value
     payment.voided_at = now

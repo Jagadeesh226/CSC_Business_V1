@@ -6,8 +6,8 @@ plus CHECK constraints on amount, status and method. Receipts get their own
 table: one per payment, unique number, frozen snapshot.
 
 Existing payment rows (none are created by the API before this phase) get
-method 'other'; any status other than 'received' stops the upgrade so a
-person can decide what it means.
+method 'other'; rows the new constraints would refuse stop the upgrade with
+a clear message. Downgrading drops receipts and void details.
 
 Revision ID: ee3ab3e4c9e8
 Revises: c1d2e3f4a5b6
@@ -49,8 +49,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['job_id'], ['jobs.id'], ),
     sa.ForeignKeyConstraint(['payment_id'], ['payments.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('payment_id'),
-    sa.UniqueConstraint('receipt_number')
+    sa.UniqueConstraint('payment_id', name='uq_receipts_payment_id'),
+    sa.UniqueConstraint('receipt_number', name='uq_receipts_receipt_number')
     )
     op.create_index(op.f('ix_receipts_customer_id'), 'receipts', ['customer_id'], unique=False)
     op.create_index(op.f('ix_receipts_job_id'), 'receipts', ['job_id'], unique=False)
@@ -61,14 +61,24 @@ def upgrade() -> None:
     op.add_column('payments', sa.Column('voided_by', sa.Integer(), nullable=True))
     op.add_column('payments', sa.Column('void_reason', sa.Text(), nullable=True))
     bind = op.get_bind()
-    unknown = bind.execute(
-        sa.text("SELECT count(*) FROM payments WHERE status <> 'received'")
-    ).scalar()
-    if unknown:
-        raise RuntimeError(
-            f"{unknown} payment rows have a status other than 'received'; "
-            "decide what they mean before upgrading."
-        )
+    # Rows the new constraints would refuse: stop with a clear message so a
+    # person decides what they mean (the API never created any).
+    for condition, problem in (
+        ("status <> 'received'", "a status other than 'received'"),
+        ("amount <= 0", "an amount of zero or less"),
+        (
+            "payment_method IS NOT NULL AND payment_method NOT IN "
+            "('cash', 'upi', 'card', 'bank_transfer', 'cheque', 'other')",
+            "an unknown payment method",
+        ),
+    ):
+        count = bind.execute(
+            sa.text(f"SELECT count(*) FROM payments WHERE {condition}")
+        ).scalar()
+        if count:
+            raise RuntimeError(
+                f"{count} payment rows have {problem}; fix them before upgrading."
+            )
     op.execute("UPDATE payments SET payment_method = 'other' WHERE payment_method IS NULL")
     op.alter_column('payments', 'payment_method',
                existing_type=sa.VARCHAR(length=50),

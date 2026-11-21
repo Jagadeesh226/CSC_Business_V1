@@ -35,7 +35,10 @@ IdempotencyKey = Annotated[
 
 WRITE = {
     404: {"model": ErrorResponse, "description": "Job not found"},
-    409: {"model": ErrorResponse, "description": "Idempotency-Key reused"},
+    409: {
+        "model": ErrorResponse,
+        "description": "Idempotency-Key already used for a different payment",
+    },
 }
 
 
@@ -44,7 +47,13 @@ WRITE = {
     response_model=PaymentRecorded,
     status_code=status.HTTP_201_CREATED,
     responses={
-        200: {"model": PaymentRecorded, "description": "Repeat of an earlier request"},
+        200: {
+            "model": PaymentRecorded,
+            "description": (
+                "Repeat of an earlier request: the original payment, as it is "
+                "now (check status: it may have been voided since)"
+            ),
+        },
         **WRITE,
     },
 )
@@ -74,7 +83,10 @@ def list_payments(job_id: Id, user: CurrentUser, db: DbSession) -> PaymentListRe
 @router.post(
     "/payments/{payment_id}/void",
     response_model=PaymentWithSummary,
-    responses={404: {"model": ErrorResponse, "description": "Payment not found"}},
+    responses={
+        404: {"model": ErrorResponse, "description": "Payment not found"},
+        409: {"model": ErrorResponse, "description": "Already voided"},
+    },
 )
 def void_payment(
     payment_id: Id, payload: VoidRequest, user: AdminUser, db: DbSession

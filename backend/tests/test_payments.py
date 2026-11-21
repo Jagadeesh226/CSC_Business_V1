@@ -24,7 +24,7 @@ from app.repositories import job_repository
 from app.schemas.job import JobCreate
 from app.schemas.payment import PaymentCreate, PaymentMethod
 from app.services import job_service, payment_service
-from app.services.errors import BusinessRuleError
+from app.services.errors import BusinessRuleError, ConflictError
 
 API = "/api/v1"
 _keys = iter(range(1, 100_000))
@@ -176,6 +176,7 @@ def test_amount_above_balance_is_refused(client, job):
         {"amount": "10", "method": "crypto"},
         {"amount": "10", "method": "upi"},  # reference required
         {"amount": "10", "method": "cheque", "reference_number": "  "},
+        {"amount": "10", "method": "upi", "reference_number": ""},
         {"amount": "10", "method": "cash", "paid_by": "someone"},
         {"amount": "10", "method": "cash", "reference_number": "x" * 101},
     ],
@@ -313,7 +314,7 @@ def test_admin_voids_a_payment(client, job, employee_user, employee_client, db_s
     assert body["receipt"]["cancelled"] is True
     assert body["receipt"]["receipt_number"] == payment["receipt"]["receipt_number"]
     assert body["summary"]["state"] == "unpaid"
-    assert client.post(url, json={"reason": "Again"}).status_code == 422
+    assert client.post(url, json={"reason": "Again"}).status_code == 409
     assert (
         client.post(f"{API}/payments/999999/void", json={"reason": "x"}).status_code
         == 404
@@ -507,3 +508,107 @@ def test_racing_payments_cannot_exceed_the_balance(test_engine, committed_job):
         assert [p.amount for p in payments] == [Decimal("70.00")]
         numbers = session.scalars(select(Receipt.receipt_number)).all()
         assert len(numbers) == 1
+
+
+# ---------- review fixes ----------
+
+
+@pytest.mark.parametrize(
+    "module", ["app.schemas.fee", "app.schemas.payment", "app.schemas.money"]
+)
+def test_schema_modules_import_on_their_own(module):
+    """No import cycle: each can be the first thing a script imports."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-c", f"import {module}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_blank_reference_is_fine_for_cash(client, job):
+    response = pay(client, job["id"], "10", reference_number="  ")
+    assert response.status_code == 201
+    assert response.json()["reference_number"] is None
+
+
+def test_a_key_tells_nothing_about_jobs_you_cannot_see(client, job, employee_client):
+    idem = key()
+    assert pay(client, job["id"], idem=idem).status_code == 201
+    # Someone else's key, sent to a job the employee cannot see or that does
+    # not exist: plain 404, not "key already used".
+    assert pay(employee_client, job["id"], idem=idem).status_code == 404
+    assert pay(employee_client, 999_999, idem=idem).status_code == 404
+
+
+def test_receipt_counter_behind_existing_receipts_recovers(client, job, db_session):
+    first = pay(client, job["id"], "10.00").json()
+    # The counter row is lost (e.g. restored data): the next number would
+    # collide with an existing receipt.
+    db_session.execute(
+        text("DELETE FROM sequence_counters WHERE name = 'receipt_number'")
+    )
+    db_session.flush()
+
+    second = pay(client, job["id"], "10.00")
+
+    assert second.status_code == 201, second.text
+    assert first["receipt"]["receipt_number"].endswith("000001")
+    assert second.json()["receipt"]["receipt_number"].endswith("000002")
+
+
+def test_receipts_have_their_own_counter(client, job, db_session):
+    number = pay(client, job["id"], "10.00").json()["receipt"]["receipt_number"]
+    assert number == f"RCP-{year(db_session)}-000001"
+    # Job numbers keep counting separately.
+    assert job["job_number"].endswith("000001")
+
+
+def test_racing_same_key_on_two_jobs_records_once(test_engine, committed_job):
+    job_id, admin_id = committed_job
+    with Session(test_engine) as session:
+        other = job_service.create_job(
+            session,
+            JobCreate(
+                customer_id=session.get(Job, job_id).customer_id,
+                service_id=session.get(Job, job_id).service_id,
+                title="Other",
+            ),
+        )
+        other_id = other.id
+    barrier = threading.Barrier(2)
+    results: list[object] = [None, None]
+
+    def run(i, target):
+        with Session(test_engine, autoflush=False) as session:
+            admin = session.get(User, admin_id)
+            barrier.wait()
+            try:
+                results[i] = payment_service.record_payment(
+                    session,
+                    target,
+                    PaymentCreate(amount=Decimal("10.00"), method=PaymentMethod.CASH),
+                    "race-two-jobs",
+                    admin,
+                )
+            except Exception as exc:  # noqa: BLE001
+                results[i] = exc
+
+    threads = [
+        threading.Thread(target=run, args=(i, t))
+        for i, t in enumerate((job_id, other_id))
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
+
+    errors = [r for r in results if isinstance(r, Exception)]
+    assert len(errors) == 1 and isinstance(errors[0], ConflictError), results
+    with Session(test_engine) as session:
+        assert len(session.scalars(select(Payment)).all()) == 1
+        assert len(session.scalars(select(Receipt)).all()) == 1

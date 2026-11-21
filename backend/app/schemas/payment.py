@@ -26,9 +26,7 @@ class PaymentStatus(StrEnum):
     VOIDED = "voided"  # an admin cancelled it; its receipt is cancelled
 
 
-Reference = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
-]
+Reference = Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)]
 
 
@@ -43,6 +41,8 @@ class PaymentCreate(BaseModel):
 
     @model_validator(mode="after")
     def reference_unless_cash(self) -> "PaymentCreate":
+        if not self.reference_number:
+            self.reference_number = None
         if self.method != PaymentMethod.CASH and not self.reference_number:
             raise ValueError("A transaction reference is required unless paid in cash.")
         if not self.notes:
