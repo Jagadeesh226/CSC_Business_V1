@@ -283,6 +283,10 @@ def test_failed_ocr_goes_to_manual_review_and_can_be_retried(client, job, db_ses
 
     retried = client.post(f"{API}/documents/{doc['id']}/ocr/retry")
     assert retried.status_code == 200
+    # While running again, the earlier failure is not shown as current.
+    assert retried.json()["ocr_status"] == "pending"
+    assert retried.json()["failure_reason"] is None
+    assert retried.json()["provider"] is None
     db_session.refresh(task)
     assert (task.status, task.attempts, task.max_attempts) == ("queued", 1, 4)
     assert db_session.get(Document, doc["id"]).status == "processing"

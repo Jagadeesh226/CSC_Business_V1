@@ -148,13 +148,16 @@ def _read(
     reviewer = (
         db.get(User, result.reviewed_by) if result and result.reviewed_by else None
     )
+    status = _status(db, document, result, bool(specs))
+    # While OCR runs again, an earlier attempt's provider and error are stale.
+    settled = result is not None and status != OcrStatus.PENDING
     return OcrRead(
         document_id=document.id,
         document_version=document.current_version,
         document_status=document.status,
-        ocr_status=_status(db, document, result, bool(specs)),
-        provider=result.provider if result else None,
-        failure_reason=result.failure_reason if result else None,
+        ocr_status=status,
+        provider=result.provider if settled else None,
+        failure_reason=result.failure_reason if settled else None,
         fields=fields,
         raw_text=extraction.get("raw_text") if reveal else None,
         reviewed_by=AssigneeRef.model_validate(reviewer) if reviewer else None,
