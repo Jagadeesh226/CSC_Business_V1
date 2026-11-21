@@ -1,6 +1,26 @@
 {
   "components": {
     "schemas": {
+      "ApplyToCustomer": {
+        "additionalProperties": false,
+        "description": "Copy one confirmed OCR value onto the customer, explicitly.",
+        "properties": {
+          "customer_field": {
+            "$ref": "#/components/schemas/CustomerField"
+          },
+          "ocr_field": {
+            "pattern": "^[a-z][a-z0-9_]{0,49}$",
+            "title": "Ocr Field",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_field",
+          "ocr_field"
+        ],
+        "title": "ApplyToCustomer",
+        "type": "object"
+      },
       "ArchiveRequest": {
         "additionalProperties": false,
         "properties": {
@@ -586,6 +606,16 @@
         ],
         "title": "CustomerCreated",
         "type": "object"
+      },
+      "CustomerField": {
+        "enum": [
+          "name",
+          "phone",
+          "email",
+          "address"
+        ],
+        "title": "CustomerField",
+        "type": "string"
       },
       "CustomerListResponse": {
         "properties": {
@@ -1710,6 +1740,15 @@
         "title": "FeeUpdate",
         "type": "object"
       },
+      "FieldFlag": {
+        "enum": [
+          "ok",
+          "low_confidence",
+          "missing"
+        ],
+        "title": "FieldFlag",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2056,6 +2095,256 @@
         "title": "OcrField",
         "type": "object"
       },
+      "OcrFieldRead": {
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "flag": {
+            "$ref": "#/components/schemas/FieldFlag"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "reviewed_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed Value"
+          },
+          "sensitive": {
+            "title": "Sensitive",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "sensitive",
+          "value",
+          "masked",
+          "confidence",
+          "flag",
+          "reviewed_value"
+        ],
+        "title": "OcrFieldRead",
+        "type": "object"
+      },
+      "OcrRead": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "integer"
+          },
+          "document_status": {
+            "title": "Document Status",
+            "type": "string"
+          },
+          "document_version": {
+            "title": "Document Version",
+            "type": "integer"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/OcrFieldRead"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "ocr_status": {
+            "$ref": "#/components/schemas/OcrStatus"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Text"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "document_id",
+          "document_version",
+          "document_status",
+          "ocr_status",
+          "provider",
+          "failure_reason",
+          "fields",
+          "raw_text",
+          "reviewed_by",
+          "reviewed_at"
+        ],
+        "title": "OcrRead",
+        "type": "object"
+      },
+      "OcrReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "apply_to_customer": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ApplyToCustomer"
+            },
+            "maxItems": 4,
+            "title": "Apply To Customer",
+            "type": "array"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ReviewDecision"
+          },
+          "fields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maxLength": 500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 30,
+            "title": "Fields",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "fields",
+          "decision"
+        ],
+        "title": "OcrReviewRequest",
+        "type": "object"
+      },
+      "OcrReviewResponse": {
+        "properties": {
+          "customer_fields_updated": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerField"
+            },
+            "title": "Customer Fields Updated",
+            "type": "array"
+          },
+          "document": {
+            "$ref": "#/components/schemas/DocumentDetail"
+          },
+          "ocr": {
+            "$ref": "#/components/schemas/OcrRead"
+          }
+        },
+        "required": [
+          "document",
+          "ocr",
+          "customer_fields_updated"
+        ],
+        "title": "OcrReviewResponse",
+        "type": "object"
+      },
+      "OcrStatus": {
+        "enum": [
+          "not_applicable",
+          "not_started",
+          "pending",
+          "completed",
+          "failed"
+        ],
+        "title": "OcrStatus",
+        "type": "string"
+      },
       "PasswordReset": {
         "additionalProperties": false,
         "properties": {
@@ -2252,6 +2541,14 @@
         },
         "title": "RequirementUpdate",
         "type": "object"
+      },
+      "ReviewDecision": {
+        "enum": [
+          "verify",
+          "reject"
+        ],
+        "title": "ReviewDecision",
+        "type": "string"
       },
       "Sensitivity": {
         "enum": [
@@ -4207,6 +4504,284 @@
           }
         },
         "summary": "Download",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/ocr": {
+      "get": {
+        "operationId": "get_ocr_api_v1_documents__document_id__ocr_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Document Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Show sensitive values and raw text (audited)",
+            "in": "query",
+            "name": "reveal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Show sensitive values and raw text (audited)",
+              "title": "Reveal",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OcrRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Reveal needs review rights"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ocr",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/ocr/retry": {
+      "post": {
+        "operationId": "retry_ocr_api_v1_documents__document_id__ocr_retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Document Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OcrRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Validation error, or a business rule (e.g. the job is closed)"
+          }
+        },
+        "summary": "Retry Ocr",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/ocr/review": {
+      "post": {
+        "operationId": "review_ocr_api_v1_documents__document_id__ocr_review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Document Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OcrReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OcrReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Validation error, or a business rule (e.g. the job is closed)"
+          }
+        },
+        "summary": "Review Ocr",
         "tags": [
           "documents"
         ]
