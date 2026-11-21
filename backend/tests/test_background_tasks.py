@@ -572,3 +572,24 @@ def test_outer_rollback_after_savepoint_publishes_nothing(factory, handler, fake
         nested.commit()
         db.rollback()
     assert stream_ids(fake_redis) == []
+
+
+def test_stop_is_signal_safe_and_prompt(factory):
+    """Integration finding: stop() must not take a lock (a second signal
+    inside the first handler could deadlock), and waiting ends quickly."""
+    import signal as signal_module
+
+    from app.workers.worker import _StopFlag
+
+    worker = Worker(factory, worker_id="w1", poll_interval=5)
+    assert isinstance(worker._stop, _StopFlag)
+    # Nested call, as a second signal arriving inside the first handler would.
+    worker.stop(signal_module.SIGTERM, None)
+    worker.stop(signal_module.SIGTERM, None)
+    assert worker._stop.is_set()
+
+    flag = _StopFlag()
+    threading.Timer(0.1, flag.set).start()
+    started = time.monotonic()
+    assert flag.wait(5) is True
+    assert time.monotonic() - started < 1

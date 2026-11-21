@@ -26,6 +26,7 @@ import os
 import signal
 import socket
 import threading
+import time
 from datetime import UTC, datetime
 
 import redis
@@ -69,6 +70,33 @@ class HandlerSession(Session):
         super().commit()
 
 
+class _StopFlag:
+    """Signal-safe stop flag.
+
+    ``threading.Event.set`` takes a lock, so a second signal arriving while
+    the first handler holds it can deadlock the process. Assigning a bool is
+    atomic and lock-free; waiting sleeps in short slices instead.
+    """
+
+    def __init__(self) -> None:
+        self._set = False
+
+    def set(self) -> None:
+        self._set = True
+
+    def is_set(self) -> bool:
+        return self._set
+
+    def wait(self, timeout: float) -> bool:
+        deadline = time.monotonic() + timeout
+        while not self._set:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.2, remaining))
+        return self._set
+
+
 class Worker:
     def __init__(
         self,
@@ -85,7 +113,7 @@ class Worker:
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
         self.poll_interval = poll_interval
         self._redis = redis_client
-        self._stop = threading.Event()
+        self._stop = _StopFlag()
         self._abandoned: list[threading.Thread] = []
 
     # ---------- loop ----------
