@@ -180,7 +180,8 @@ def _job_filters(
         conditions.append(_actively_assigned(user_id))
     progress = None
     if readiness is not None:
-        progress = readiness_repo.progress_subquery()
+        # Every readiness value matches only jobs still gathering documents.
+        progress = readiness_repo.progress_subquery(DOCUMENT_STAGES)
         conditions.append(readiness_condition(progress, readiness))
     if due is not None:
         if today is None:
@@ -236,7 +237,8 @@ def list_jobs(
 
 def readiness_condition(progress: Subquery, readiness: str) -> ColumnElement[bool]:
     """Jobs still gathering documents whose progress matches ``readiness``
-    (see ``app.schemas.job.Readiness``)."""
+    (see ``app.schemas.job.Readiness``). A job whose service needs no
+    documents counts as complete, as for the submit check."""
 
     def col(name: str) -> ColumnElement[int]:
         return readiness_repo.column(progress, name)

@@ -74,6 +74,22 @@ def _conditions(
     return conditions
 
 
+def _base(select_stmt):
+    """Same joins for the count and the page, so totals always match."""
+    return (
+        select_stmt.select_from(Document)
+        .join(
+            DocumentVersion,
+            and_(
+                DocumentVersion.document_id == Document.id,
+                DocumentVersion.version == Document.current_version,
+            ),
+        )
+        .join(Customer, Customer.id == Document.customer_id)
+        .outerjoin(DocumentType, DocumentType.id == Document.document_type_id)
+    )
+
+
 def count(
     db: Session,
     *,
@@ -83,9 +99,9 @@ def count(
 ) -> int:
     return int(
         db.scalar(
-            select(func.count())
-            .select_from(Document)
-            .where(*_conditions(employee_id, customer_id, job_id))
+            _base(select(func.count())).where(
+                *_conditions(employee_id, customer_id, job_id)
+            )
         )
         or 0
     )
@@ -102,16 +118,7 @@ def page(
 ) -> list[tuple[Document, datetime, Customer, DocumentType | None]]:
     """Oldest waiting first (by when the current version was uploaded)."""
     rows = db.execute(
-        select(Document, DocumentVersion.uploaded_at, Customer, DocumentType)
-        .join(
-            DocumentVersion,
-            and_(
-                DocumentVersion.document_id == Document.id,
-                DocumentVersion.version == Document.current_version,
-            ),
-        )
-        .join(Customer, Customer.id == Document.customer_id)
-        .outerjoin(DocumentType, DocumentType.id == Document.document_type_id)
+        _base(select(Document, DocumentVersion.uploaded_at, Customer, DocumentType))
         .where(*_conditions(employee_id, customer_id, job_id))
         .order_by(DocumentVersion.uploaded_at, Document.id)
         .offset(offset)

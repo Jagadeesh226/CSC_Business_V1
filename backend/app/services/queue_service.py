@@ -23,6 +23,7 @@ from app.schemas.queue import (
     WorkQueueSummary,
 )
 from app.services import job_service
+from app.services.errors import NotFoundError
 from app.workers.ocr_handler import LOW_CONFIDENCE
 
 
@@ -73,6 +74,12 @@ def review_queue(
     job_id: int | None = None,
 ) -> ReviewQueueResponse:
     employee_id = _employee_id(viewer)
+    if job_id is not None:
+        # 404 for jobs the viewer cannot see, as everywhere else; otherwise
+        # the filter would reveal which hidden jobs share a document.
+        if job_repository.get_job(db, job_id) is None:
+            raise NotFoundError(job_service.JOB_NOT_FOUND)
+        job_service.ensure_job_access(db, job_id, viewer)
     filters = {
         "employee_id": employee_id,
         "customer_id": customer_id,

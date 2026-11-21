@@ -543,3 +543,77 @@ def test_employee_queue_hides_other_jobs_and_closed_job_documents(
     # Once a closed job uses it, the employee can no longer change it.
     set_status(db_session, theirs, "completed")
     assert mine_client.get(f"{API}/review-queue").json()["total"] == 0
+
+
+# ---------- review findings ----------
+
+
+def test_employee_cannot_probe_hidden_jobs_through_the_job_filter(
+    client, db_session, make_job, make_customer, two_employees
+):
+    (_, mine_client), (_, other_client) = two_employees
+    customer = make_customer()
+    mine = make_job("mine", customer=customer, as_client=mine_client)
+    theirs = make_job("theirs", customer=customer, as_client=other_client)
+    shared = upload(mine_client, mine, "PHOTO", photo_bytes())
+    item = db_session.scalar(
+        select(JobChecklistItem).where(
+            JobChecklistItem.job_id == theirs["id"],
+            JobChecklistItem.document_type_code == "PHOTO",
+        )
+    )
+    db_session.add(
+        JobDocument(
+            job_id=theirs["id"], document_id=shared["id"], checklist_item_id=item.id
+        )
+    )
+    db_session.flush()
+
+    hidden = mine_client.get(f"{API}/review-queue", params={"job_id": theirs["id"]})
+    missing = mine_client.get(f"{API}/review-queue", params={"job_id": 999_999})
+    assert hidden.status_code == missing.status_code == 404
+    assert hidden.json() == missing.json()
+    own = mine_client.get(f"{API}/review-queue", params={"job_id": mine["id"]})
+    assert own.json()["total"] == 1
+    # Admins can filter by any job.
+    assert (
+        client.get(f"{API}/review-queue", params={"job_id": theirs["id"]}).json()[
+            "total"
+        ]
+        == 1
+    )
+
+
+def test_mixed_documents_on_one_item(client, db_session, make_job):
+    job = make_job()
+    rejected = upload(client, job, "PHOTO", photo_bytes())
+    client.post(f"{API}/documents/{rejected['id']}/reject", json={"reason": "Blurry"})
+    upload(client, job, "PHOTO", photo_bytes())  # a new one waits for review
+    p = progress(client, job)
+    assert (p["to_review"], p["rejected"]) == (1, 0)
+    item = next(
+        i
+        for i in client.get(f"{API}/jobs/{job['id']}/checklist").json()["items"]
+        if i["document_type_code"] == "PHOTO"
+    )
+    assert item["state"] == "pending"
+
+
+def test_job_needing_no_documents_is_ready_to_submit(
+    client, db_session, make_customer, make_service
+):
+    """Consistent with the submit check: nothing to verify, nothing blocks it."""
+    job = client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": make_customer().id,
+            "service_id": make_service().id,
+            "title": "No documents",
+        },
+    ).json()
+    set_status(db_session, job, "in_progress")
+    found = ids(client.get(f"{API}/jobs", params={"readiness": "ready_to_submit"}))
+    assert found == [job["id"]]
+    assert (
+        ids(client.get(f"{API}/jobs", params={"readiness": "missing_documents"})) == []
+    )

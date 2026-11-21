@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from app.models import Document, JobChecklistItem, JobDocument
+from app.models import Document, Job, JobChecklistItem, JobDocument
 
 ITEM_STATES = ("verified", "to_review", "processing", "rejected", "missing")
 # Business dates follow the centre's calendar (same zone as job numbers).
@@ -38,7 +38,7 @@ def business_today(db: Session) -> date:
     return db.scalar(select(func.date(func.timezone(BUSINESS_TIMEZONE, func.now()))))
 
 
-def _item_states() -> Subquery:
+def _item_states(job_statuses: tuple[str, ...] | None) -> Subquery:
     """One row per required checklist item: (job_id, state)."""
     docs = (
         select(
@@ -65,6 +65,15 @@ def _item_states() -> Subquery:
         (docs.c.item_id.is_not(None), literal("rejected")),
         else_=literal("missing"),
     )
+    status_filter = (
+        [
+            JobChecklistItem.job_id.in_(
+                select(Job.id).where(Job.status.in_(job_statuses))
+            )
+        ]
+        if job_statuses is not None
+        else []
+    )
     return (
         select(JobChecklistItem.job_id.label("job_id"), state.label("state"))
         .outerjoin(
@@ -74,15 +83,16 @@ def _item_states() -> Subquery:
                 docs.c.job_id == JobChecklistItem.job_id,
             ),
         )
-        .where(JobChecklistItem.is_required.is_(True))
+        .where(JobChecklistItem.is_required.is_(True), *status_filter)
         .subquery()
     )
 
 
-def progress_subquery() -> Subquery:
+def progress_subquery(job_statuses: tuple[str, ...] | None = None) -> Subquery:
     """Per job with required items: required_total and a count per state.
-    Jobs without required items have no row (treat counts as 0)."""
-    items = _item_states()
+    Jobs without required items have no row (treat counts as 0).
+    ``job_statuses`` limits the work to jobs in those statuses."""
+    items = _item_states(job_statuses)
     counts = [func.count().filter(items.c.state == s).label(s) for s in ITEM_STATES]
     return (
         select(
