@@ -1,4 +1,5 @@
 from app.models.audit_log import AuditLog
+from app.models.background_task import TASK_TYPES, BackgroundTask
 from app.models.customer import Customer
 from app.models.document import Document
 from app.models.document_type import DocumentType
@@ -19,7 +20,9 @@ from app.models.user import User
 from app.models.user_session import UserSession
 
 __all__ = [
+    "TASK_TYPES",
     "AuditLog",
+    "BackgroundTask",
     "Customer",
     "Document",
     "DocumentType",
