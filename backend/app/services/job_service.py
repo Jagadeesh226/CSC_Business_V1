@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Job, JobAssignment, JobStatusHistory, User
 from app.repositories import job_repository as repo
-from app.repositories import user_repository
+from app.repositories import readiness_repository, user_repository
 from app.repositories.job_repository import JobRow
 from app.schemas.job import (
     FINAL_STATUSES,
@@ -14,11 +14,15 @@ from app.schemas.job import (
     AssigneeRef,
     AssignmentRead,
     CustomerRef,
+    DocumentProgress,
+    DueFilter,
     JobCreate,
     JobListResponse,
     JobRead,
+    JobSort,
     JobStatus,
     JobUpdate,
+    Readiness,
     ServiceRef,
     StatusHistoryRead,
 )
@@ -34,7 +38,7 @@ from app.services.errors import (
 JOB_NUMBER_SEQUENCE = "job_number"
 JOB_NUMBER_PREFIX = "CSC"
 # The job-number year follows the centre's local calendar, not UTC.
-BUSINESS_TIMEZONE = "Asia/Kolkata"
+BUSINESS_TIMEZONE = readiness_repository.BUSINESS_TIMEZONE
 
 JOB_NOT_FOUND = "Job not found."
 
@@ -60,7 +64,13 @@ def ensure_job_access(db: Session, job_id: int, viewer: User | None) -> None:
         raise NotFoundError(JOB_NOT_FOUND)
 
 
-def _to_read(row: JobRow, assignees: list[User]) -> JobRead:
+def _progress(counts: dict[str, int]) -> DocumentProgress:
+    return DocumentProgress(
+        **counts, complete=counts["verified"] == counts["required_total"]
+    )
+
+
+def _to_read(row: JobRow, assignees: list[User], counts: dict[str, int]) -> JobRead:
     job, customer, service = row
     return JobRead(
         id=job.id,
@@ -82,6 +92,7 @@ def _to_read(row: JobRow, assignees: list[User]) -> JobRead:
         else None,
         assignees=[AssigneeRef.model_validate(u) for u in assignees],
         allowed_next_statuses=list(STATUS_TRANSITIONS.get(job.status, ())),
+        document_progress=_progress(counts),
     )
 
 
@@ -90,7 +101,11 @@ def get_job(db: Session, job_id: int, viewer: User | None = None) -> JobRead:
     if row is None:
         raise NotFoundError(JOB_NOT_FOUND)
     ensure_job_access(db, job_id, viewer)
-    return _to_read(row, repo.active_assignees(db, [job_id])[job_id])
+    return _to_read(
+        row,
+        repo.active_assignees(db, [job_id])[job_id],
+        readiness_repository.progress_for_jobs(db, [job_id])[job_id],
+    )
 
 
 def create_job(db: Session, data: JobCreate, creator: User | None = None) -> JobRead:
@@ -183,6 +198,10 @@ def list_jobs(
     status: JobStatus | None = None,
     due_date: date | None = None,
     assigned_to: int | None = None,
+    readiness: Readiness | None = None,
+    due: DueFilter | None = None,
+    unassigned: bool = False,
+    sort: JobSort = JobSort.NEWEST,
 ) -> JobListResponse:
     search = search.strip() if search else None
     rows, total = repo.list_jobs(
@@ -196,10 +215,20 @@ def list_jobs(
         due_date=due_date,
         assigned_to=assigned_to,
         visible_to=None if viewer is None or is_admin(viewer) else viewer.id,
+        readiness=readiness.value if readiness is not None else None,
+        due=due.value if due is not None else None,
+        today=readiness_repository.business_today(db) if due is not None else None,
+        unassigned=unassigned,
+        sort=sort.value,
     )
-    assignees = repo.active_assignees(db, [row[0].id for row in rows])
+    job_ids = [row[0].id for row in rows]
+    assignees = repo.active_assignees(db, job_ids)
+    progress = readiness_repository.progress_for_jobs(db, job_ids)
     return JobListResponse(
-        items=[_to_read(row, assignees[row[0].id]) for row in rows],
+        items=[
+            _to_read(row, assignees[i], progress[i])
+            for i, row in zip(job_ids, rows, strict=True)
+        ],
         total=total,
         page=page,
         page_size=page_size,
