@@ -928,6 +928,21 @@
             ],
             "title": "Rejection Reason"
           },
+          "reusable": {
+            "title": "Reusable",
+            "type": "boolean"
+          },
+          "reuse_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Block Reason"
+          },
           "size_bytes": {
             "title": "Size Bytes",
             "type": "integer"
@@ -992,6 +1007,8 @@
           "verified_at",
           "archived_at",
           "archive_reason",
+          "reusable",
+          "reuse_block_reason",
           "job_ids",
           "versions"
         ],
@@ -1094,6 +1111,21 @@
             ],
             "title": "Rejection Reason"
           },
+          "reusable": {
+            "title": "Reusable",
+            "type": "boolean"
+          },
+          "reuse_block_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reuse Block Reason"
+          },
           "size_bytes": {
             "title": "Size Bytes",
             "type": "integer"
@@ -1151,6 +1183,8 @@
           "verified_at",
           "archived_at",
           "archive_reason",
+          "reusable",
+          "reuse_block_reason",
           "job_ids"
         ],
         "title": "DocumentRead",
