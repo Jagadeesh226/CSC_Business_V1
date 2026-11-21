@@ -28,6 +28,9 @@ class Job(Base):
         nullable=True,
         index=True,
     )
+    # The service name when the job was created: renaming a service later
+    # does not change existing jobs (owner decision).
+    service_name: Mapped[str | None] = mapped_column(String(200))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(

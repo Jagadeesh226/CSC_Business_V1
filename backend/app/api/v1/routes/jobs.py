@@ -214,7 +214,12 @@ def change_status(
     job_id: JobId, payload: StatusChangeRequest, user: CurrentUser, db: DbSession
 ) -> JobRead:
     return job_service.change_status(
-        db, job_id, payload.status, actor=user, reason=payload.reason
+        db,
+        job_id,
+        payload.status,
+        actor=user,
+        reason=payload.reason,
+        override_document_check=payload.override_document_check,
     )
 
 

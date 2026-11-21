@@ -53,7 +53,16 @@ def main(argv: list[str] | None = None) -> int:
     create = commands.add_parser("create-admin", help="Create an admin user")
     create.add_argument("--name", required=True)
     create.add_argument("--email", required=True)
+    commands.add_parser(
+        "generate-storage-key",
+        help="Print a new DOCUMENT_ENCRYPTION_KEY (store it in your secrets)",
+    )
     args = parser.parse_args(argv)
+    if args.command == "generate-storage-key":
+        from app.core.storage import generate_key
+
+        print(generate_key())
+        return 0
     return _create_admin(args)
 
 

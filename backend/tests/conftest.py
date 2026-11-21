@@ -53,6 +53,17 @@ def _test_database_url() -> str:
     return url
 
 
+@pytest.fixture(scope="session", autouse=True)
+def document_storage(tmp_path_factory) -> Path:
+    """Encrypted document storage in a throwaway directory with a throwaway key."""
+    from app.core.storage import generate_key
+
+    root = tmp_path_factory.mktemp("documents")
+    os.environ["DOCUMENT_STORAGE_DIR"] = str(root)
+    os.environ["DOCUMENT_ENCRYPTION_KEY"] = generate_key()
+    return root
+
+
 @pytest.fixture(scope="session")
 def test_engine() -> Iterator[Engine]:
     url = _test_database_url()

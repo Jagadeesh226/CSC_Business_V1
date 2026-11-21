@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError
 
 from app.api.v1.router import api_router
+from app.core.body_limit import UploadBodyLimit
+from app.core.storage import StorageNotConfigured
 from app.services.errors import ServiceError
 
 app = FastAPI(
@@ -11,6 +13,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Outermost after CORS: oversized uploads are refused before any parsing.
+app.add_middleware(UploadBodyLimit)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -45,6 +49,16 @@ def handle_data_error(_: Request, exc: DataError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"detail": "The request contains characters that cannot be stored."},
+    )
+
+
+@app.exception_handler(StorageNotConfigured)
+def handle_storage_not_configured(
+    _: Request, exc: StorageNotConfigured
+) -> JSONResponse:
+    # Deployment problem, not a client error; details stay in server config.
+    return JSONResponse(
+        status_code=503, content={"detail": "Document storage is not configured."}
     )
 
 
