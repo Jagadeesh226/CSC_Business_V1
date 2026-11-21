@@ -32,11 +32,14 @@ class TaskInfo:
     task_type: str
     payload: dict[str, Any]
     attempt: int
+    # The task's time limit: handlers give external calls a deadline inside it.
+    timeout_seconds: int = 120
 
 
 Handler = Callable[[Session, TaskInfo], dict[str, Any] | None]
-# Called once a task has failed for good, in the worker's transaction (it
-# must not commit), e.g. to send a document to manual review.
+# Called once a task has failed for good, in its own transaction after the
+# failure is saved (it must not commit), e.g. to send a document to manual
+# review. It may run more than once for a task, so it must be idempotent.
 FailureHook = Callable[[Session, TaskInfo, str], None]
 
 
@@ -88,3 +91,19 @@ def unregister(task_type: str) -> None:
 
 def get_spec(task_type: str) -> TaskSpec | None:
     return _REGISTRY.get(task_type)
+
+
+# Periodic maintenance run by every worker on each loop, e.g. recovering
+# documents left in 'processing'. Each gets its own session and must not
+# commit; it returns how many records it fixed.
+Maintenance = Callable[[Session], int]
+_MAINTENANCE: list[Maintenance] = []
+
+
+def register_maintenance(job: Maintenance) -> None:
+    if job not in _MAINTENANCE:
+        _MAINTENANCE.append(job)
+
+
+def maintenance_jobs() -> list[Maintenance]:
+    return list(_MAINTENANCE)

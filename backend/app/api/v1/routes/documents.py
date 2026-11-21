@@ -205,7 +205,14 @@ def link_document(
 # ---------- OCR review ----------
 
 
-@router.get("/documents/{document_id}/ocr", response_model=OcrRead, responses=NOT_FOUND)
+@router.get(
+    "/documents/{document_id}/ocr",
+    response_model=OcrRead,
+    responses={
+        **NOT_FOUND,
+        403: {"model": ErrorResponse, "description": "Reveal needs review rights"},
+    },
+)
 def get_ocr(
     document_id: Id,
     user: CurrentUser,

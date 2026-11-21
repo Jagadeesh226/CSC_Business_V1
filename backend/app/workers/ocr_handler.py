@@ -6,15 +6,18 @@ document type lists, then - holding the document lock and only if the
 document is still that version and still processing - saves the encrypted
 result and moves the document to ``needs_review`` for a person to check.
 
-Idempotent: a version that already has a completed result is skipped, and a
-stale task (newer version uploaded, document archived or reviewed) does
-nothing. The provider is called before any lock is taken, so a slow OCR
-service never holds up people working on the document.
+A document never stays in ``processing`` once its task has failed for good:
+the failure hook sends it to manual review, and a maintenance sweep run by
+every worker catches any case the hook missed (worker crash, lock clash).
+
+Idempotent: a stale task (newer version uploaded, document archived or
+already reviewed) does nothing. The provider is called before any lock is
+taken, so a slow OCR service never holds up people working on the document.
 """
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.storage import get_storage, seal
@@ -27,14 +30,19 @@ from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
 
 TASK_TYPE = "document_ocr"
 LOW_CONFIDENCE = 0.80
+# Safe, fixed messages: provider error text is never stored or shown.
+TEMPORARY_FAILURE = "The OCR service is temporarily unavailable."
+UNREADABLE = "The OCR service could not read this file."
 
 
 def idempotency_key(document_id: int, version: int) -> str:
     return f"{TASK_TYPE}:{document_id}:v{version}"
 
 
-def sealed_context(document_id: int, version: int) -> str:
-    return f"ocr:{document_id}:v{version}"
+def sealed_context(document_id: int, version: int, part: str) -> str:
+    """Distinct per value ('extraction' or 'review'), so sealed values cannot
+    be swapped between columns or rows unnoticed."""
+    return f"ocr:{document_id}:v{version}:{part}"
 
 
 def field_specs(db: Session, document: Document) -> list[ocr_provider.FieldSpec]:
@@ -45,6 +53,10 @@ def field_specs(db: Session, document: Document) -> list[ocr_provider.FieldSpec]
         ocr_provider.FieldSpec(f["key"], f["label"], bool(f.get("sensitive")))
         for f in (doc_type.ocr_fields if doc_type else [])
     ]
+
+
+def wants_ocr(db: Session, document: Document) -> bool:
+    return ocr_provider.configured() and bool(field_specs(db, document))
 
 
 def _is_current(document: Document | None, version: int) -> bool:
@@ -65,6 +77,10 @@ def _existing(db: Session, document_id: int, version: int) -> OcrResult | None:
     )
 
 
+def _spec_rows(specs: list[ocr_provider.FieldSpec]) -> list[dict]:
+    return [{"key": s.key, "label": s.label, "sensitive": s.sensitive} for s in specs]
+
+
 def run_document_ocr(db: Session, info: TaskInfo) -> dict:
     document_id = int(info.payload["document_id"])
     version = int(info.payload["version"])
@@ -74,9 +90,6 @@ def run_document_ocr(db: Session, info: TaskInfo) -> dict:
         raise PermanentTaskError("The document no longer exists.")
     if not _is_current(document, version):
         return {"skipped": "stale"}
-    existing = _existing(db, document_id, version)
-    if existing is not None and existing.status == "completed":
-        return {"skipped": "already_done"}
 
     stored = document_repository.get_version(db, document_id, version)
     if stored is None:
@@ -84,11 +97,17 @@ def run_document_ocr(db: Session, info: TaskInfo) -> dict:
     specs = field_specs(db, document)
     data = get_storage().load(stored.storage_key)
     try:
-        output = ocr_provider.get_provider().extract(data, stored.content_type, specs)
-    except ocr_provider.OcrTemporaryError as exc:
-        raise TaskError(str(exc)) from None
-    except ocr_provider.OcrUnsupportedError as exc:
-        raise PermanentTaskError(str(exc)) from None
+        output = ocr_provider.get_provider().extract(
+            data,
+            stored.content_type,
+            specs,
+            # Leave time to save the result within the task's limit.
+            timeout_seconds=max(info.timeout_seconds - 10, 5),
+        )
+    except ocr_provider.OcrTemporaryError:
+        raise TaskError(TEMPORARY_FAILURE) from None
+    except ocr_provider.OcrUnsupportedError:
+        raise PermanentTaskError(UNREADABLE) from None
     del data
 
     # Only now take the lock, and re-check nothing changed meanwhile.
@@ -96,19 +115,26 @@ def run_document_ocr(db: Session, info: TaskInfo) -> dict:
     if not _is_current(document, version):
         return {"skipped": "stale"}
 
-    values = {k: f.value for k, f in output.fields.items()}
-    confidences = {k: f.confidence for k, f in output.fields.items()}
-    sealed = seal(
-        json.dumps({"fields": values, "raw_text": output.raw_text}).encode(),
-        sealed_context(document_id, version),
+    values = {
+        s.key: output.fields[s.key].value for s in specs if s.key in output.fields
+    }
+    confidences = {
+        s.key: (output.fields[s.key].confidence if s.key in output.fields else None)
+        for s in specs
+    }
+    result = _existing(db, document_id, version) or OcrResult(
+        document_id=document_id, document_version=version
     )
-    result = existing or OcrResult(document_id=document_id, document_version=version)
     result.task_id = info.id
     result.status = "completed"
     result.provider = output.provider
     result.provider_version = output.provider_version
+    result.field_specs = _spec_rows(specs)
     result.confidences = confidences
-    result.extraction_sealed = sealed
+    result.extraction_sealed = seal(
+        json.dumps({"fields": values, "raw_text": output.raw_text}).encode(),
+        sealed_context(document_id, version, "extraction"),
+    )
     result.failure_reason = None
     db.add(result)
     document.status = "needs_review"
@@ -133,30 +159,31 @@ def run_document_ocr(db: Session, info: TaskInfo) -> dict:
     }
 
 
-def on_ocr_failed(db: Session, info: TaskInfo, error: str) -> None:
-    """OCR failed for good: send the document to manual review instead of
-    leaving it in 'processing'. Skips a document locked by a late handler."""
-    document_id = int(info.payload["document_id"])
-    version = int(info.payload["version"])
+def send_to_manual_review(
+    db: Session, document_id: int, version: int, task_id: int, reason: str
+) -> bool:
+    """OCR failed for good: record it and let a person review the document.
+    Waits for the document lock (bounded by lock_timeout). Idempotent."""
     document = db.scalar(
         select(Document)
         .where(Document.id == document_id)
-        .with_for_update(skip_locked=True)
+        .with_for_update()
         .execution_options(populate_existing=True)
     )
     if not _is_current(document, version):
-        return
+        return False
     result = _existing(db, document_id, version) or OcrResult(
         document_id=document_id, document_version=version
     )
     if result.status == "completed":
-        return
-    result.task_id = info.id
+        return False
+    result.task_id = task_id
     result.status = "failed"
     result.provider = result.provider or "unknown"
     result.provider_version = result.provider_version or "unknown"
+    result.field_specs = result.field_specs or _spec_rows(field_specs(db, document))
     result.confidences = result.confidences or {}
-    result.failure_reason = error[:500]
+    result.failure_reason = reason[:500]
     db.add(result)
     document.status = "needs_review"
     audit_service.record(
@@ -164,8 +191,45 @@ def on_ocr_failed(db: Session, info: TaskInfo, error: str) -> None:
         action="document_ocr_failed",
         entity_type="document",
         entity_id=document_id,
-        details={"version": version, "reason": error[:200]},
+        details={"version": version, "reason": reason[:200]},
+    )
+    return True
+
+
+def on_ocr_failed(db: Session, info: TaskInfo, error: str) -> None:
+    send_to_manual_review(
+        db,
+        int(info.payload["document_id"]),
+        int(info.payload["version"]),
+        info.id,
+        error,
+    )
+
+
+def recover_stuck_documents(db: Session) -> int:
+    """Maintenance: documents still 'processing' whose OCR task for that
+    version has failed go to manual review."""
+    # "\\:" keeps SQLAlchemy from reading ":v" as a bind parameter.
+    rows = db.execute(
+        text(
+            """
+            SELECT d.id, d.current_version, t.id AS task_id, t.last_error
+            FROM documents d
+            JOIN background_tasks t
+              ON t.idempotency_key = 'document_ocr:' || d.id || '\\:v' || d.current_version
+            WHERE d.status = 'processing' AND t.status = 'failed'
+            ORDER BY d.id
+            LIMIT 100
+            """
+        )
+    ).all()
+    return sum(
+        send_to_manual_review(
+            db, r.id, r.current_version, r.task_id, r.last_error or UNREADABLE
+        )
+        for r in rows
     )
 
 
 registry.register(TASK_TYPE, run_document_ocr, on_final_failure=on_ocr_failed)
+registry.register_maintenance(recover_stuck_documents)

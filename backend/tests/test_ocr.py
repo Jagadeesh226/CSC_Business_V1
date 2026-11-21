@@ -252,7 +252,7 @@ def test_ocr_skips_stale_versions(client, job, db_session):
 
 def test_ocr_provider_errors(client, job, db_session):
     busy = upload_aadhaar(client, job, scan(error="temporary"))
-    with pytest.raises(TaskError, match="busy"):
+    with pytest.raises(TaskError, match="temporarily unavailable"):
         run_ocr(db_session, busy["id"])
 
 
@@ -286,7 +286,8 @@ def test_failed_ocr_goes_to_manual_review_and_can_be_retried(client, job, db_ses
     db_session.refresh(task)
     assert (task.status, task.attempts, task.max_attempts) == ("queued", 1, 4)
     assert db_session.get(Document, doc["id"]).status == "processing"
-    assert client.post(f"{API}/documents/{doc['id']}/ocr/retry").status_code == 422
+    again = client.post(f"{API}/documents/{doc['id']}/ocr/retry")
+    assert again.status_code == 409  # already queued
 
 
 # ---------- reading results ----------
@@ -569,3 +570,228 @@ def test_upload_to_review_through_the_real_worker(committed, fake_redis):
         assert session.get(Document, doc.id).status == "needs_review"
         task = session.scalar(select(BackgroundTask))
         assert (task.status, task.result["fields"]) == ("succeeded", 1)
+
+
+# ---------- review fixes ----------
+
+
+def test_document_ocr_cannot_be_retried_from_the_task_list(client, job, db_session):
+    """Review M-1: the document's own retry also resets the document."""
+    from app.services import task_service
+
+    doc = upload_aadhaar(client, job, scan(error="unsupported"))
+    task = ocr_task(db_session, doc["id"])
+    task.status = "failed"
+    db_session.flush()
+    admin = db_session.scalar(select(User).where(User.role == "admin"))
+    with pytest.raises(Exception, match="Retry OCR from the document"):
+        task_service.retry_task(db_session, task.id, admin)
+
+
+def test_plain_verify_needs_the_ocr_review(client, job, db_session):
+    """Review L-6: OCR-read values are always looked at before verifying."""
+    doc = upload_aadhaar(client, job)
+    run_ocr(db_session, doc["id"])
+    response = client.post(f"{API}/documents/{doc['id']}/verify")
+    assert response.status_code == 422
+    assert "OCR review" in response.json()["detail"]
+
+
+def test_validation_errors_do_not_echo_submitted_values(client, job, db_session):
+    """Review L-2: a rejected review must not send the Aadhaar number back."""
+    doc = upload_aadhaar(client, job)
+    run_ocr(db_session, doc["id"])
+    response = client.post(
+        f"{API}/documents/{doc['id']}/ocr/review",
+        json={"fields": {"aadhaar_number": "1" * 600}, "decision": "verify"},
+    )
+    assert response.status_code == 422
+    assert "1" * 600 not in response.text
+    assert all("input" not in e for e in response.json()["detail"])
+
+
+def test_no_ocr_without_a_configured_provider(client, job, db_session, monkeypatch):
+    """Review L-3 and L-1: unconfigured means 'not started', never 'fake'."""
+    monkeypatch.delenv("OCR_PROVIDER")
+    doc = upload_aadhaar(client, job)
+    assert doc["status"] == "uploaded"
+    assert ocr_task(db_session, doc["id"]) is None
+    assert (
+        client.get(f"{API}/documents/{doc['id']}/ocr").json()["ocr_status"]
+        == "not_started"
+    )
+
+    monkeypatch.setenv("OCR_PROVIDER", "fake")  # OCR set up later: start it
+    started = client.post(f"{API}/documents/{doc['id']}/ocr/retry")
+    assert started.status_code == 200
+    assert started.json()["ocr_status"] == "pending"
+    assert ocr_task(db_session, doc["id"]) is not None
+
+
+def test_retry_refused_on_closed_job(
+    client, employee_client, employee_user, job, db_session
+):
+    """Review L-7."""
+    from app.models import Job
+
+    client.post(
+        f"{API}/jobs/{job['id']}/assignments", json={"user_id": employee_user.id}
+    )
+    doc = upload_aadhaar(client, job, scan(error="unsupported"))
+    task = ocr_task(db_session, doc["id"])
+    task.status = "failed"
+    info = TaskInfo(
+        id=task.id, task_type=task.task_type, payload=task.payload, attempt=1
+    )
+    ocr_handler.on_ocr_failed(db_session, info, "x")
+    db_session.get(Job, job["id"]).status = "completed"
+    db_session.flush()
+    assert (
+        employee_client.post(f"{API}/documents/{doc['id']}/ocr/retry").status_code
+        == 422
+    )
+
+
+def test_sealed_values_cannot_be_swapped(client, job, db_session):
+    """Review L-8: extraction and review use different binding contexts."""
+    from cryptography.exceptions import InvalidTag
+
+    from app.core.storage import unseal
+
+    doc = upload_aadhaar(client, job)
+    run_ocr(db_session, doc["id"])
+    result = db_session.scalar(
+        select(OcrResult).where(OcrResult.document_id == doc["id"])
+    )
+    with pytest.raises(InvalidTag):
+        unseal(
+            result.extraction_sealed, ocr_handler.sealed_context(doc["id"], 1, "review")
+        )
+
+
+def test_ocr_views_and_refused_reveals_are_audited(
+    client, make_client, make_user, job, customer, db_session
+):
+    """Review L-9."""
+    doc = upload_aadhaar(client, job)
+    run_ocr(db_session, doc["id"])
+    client.get(f"{API}/documents/{doc['id']}/ocr")
+    other = client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": job["service"]["id"],
+            "title": "2",
+        },
+    ).json()
+    viewer_user = make_user()
+    client.post(
+        f"{API}/jobs/{other['id']}/assignments", json={"user_id": viewer_user.id}
+    )
+    make_client(viewer_user).get(
+        f"{API}/documents/{doc['id']}/ocr", params={"reveal": True}
+    )
+    actions = db_session.scalars(
+        select(AuditLog.action).where(AuditLog.entity_id == doc["id"])
+    ).all()
+    assert "ocr_viewed" in actions
+    assert "ocr_reveal_denied" in actions
+
+
+def test_masking_follows_the_result_not_later_type_edits(
+    client, job, catalogue, db_session
+):
+    """Review L-5: the field list is frozen with the result."""
+    doc = upload_aadhaar(client, job)
+    run_ocr(db_session, doc["id"])
+    catalogue["aadhaar"].ocr_fields = [
+        {"key": "aadhaar_number", "label": "Aadhaar", "sensitive": False}
+    ]
+    db_session.flush()
+    fields = client.get(f"{API}/documents/{doc['id']}/ocr").json()["fields"]
+    by_key = {f["key"]: f for f in fields}
+    assert by_key["aadhaar_number"]["value"] == "**** **** 9012"  # still masked
+    assert len(fields) == 4
+
+
+# ---------- review H-1: documents never stay in 'processing' ----------
+
+
+def _committed_upload(factory, ids, data):
+    customer_id, job_id, admin_id = ids
+    with factory() as session:
+        admin = session.get(User, admin_id)
+        item_id = document_service.build_checklist(session, job_id).items[0].id
+        return document_service.upload(
+            session,
+            customer_id,
+            check_upload(data, "a.png"),
+            admin,
+            job_id=job_id,
+            checklist_item_id=item_id,
+        ).id
+
+
+def _doc_status(factory, doc_id):
+    with factory() as session:
+        return session.get(Document, doc_id).status
+
+
+def test_permanent_failure_through_the_worker_goes_to_review(committed):
+    from app.workers.worker import Worker
+
+    factory, ids = committed
+    doc_id = _committed_upload(factory, ids, scan(error="unsupported"))
+    Worker(factory, worker_id="w1").tick()
+    assert _doc_status(factory, doc_id) == "needs_review"
+    with factory() as session:
+        result = session.scalar(select(OcrResult))
+        assert (result.status, result.failure_reason) == (
+            "failed",
+            ocr_handler.UNREADABLE,
+        )
+
+
+def test_lease_expiry_on_last_attempt_goes_to_review(committed):
+    """The worker died on the last attempt: the expiry path runs the hook."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.repositories import task_repository
+    from app.workers.worker import Worker
+
+    factory, ids = committed
+    doc_id = _committed_upload(factory, ids, GOOD)
+    with factory() as session:
+        task_repository.claim(session, "crashed-worker")
+        session.execute(
+            update(BackgroundTask).values(
+                attempts=3, lease_expires_at=datetime.now(UTC) - timedelta(seconds=1)
+            )
+        )
+        session.commit()
+    Worker(factory, worker_id="w2").requeue_expired()
+    assert _doc_status(factory, doc_id) == "needs_review"
+
+
+def test_maintenance_recovers_documents_the_hook_missed(committed):
+    """E.g. the hook could not run (lock clash, crash): the sweep fixes it."""
+    from sqlalchemy import update
+
+    from app.workers.worker import Worker
+
+    factory, ids = committed
+    doc_id = _committed_upload(factory, ids, GOOD)
+    with factory() as session:  # failed task, document left in processing
+        session.execute(
+            update(BackgroundTask).values(status="failed", last_error="Timed out.")
+        )
+        session.commit()
+    assert _doc_status(factory, doc_id) == "processing"
+
+    assert Worker(factory, worker_id="w1").run_maintenance() == 1
+
+    assert _doc_status(factory, doc_id) == "needs_review"
+    with factory() as session:
+        assert session.scalar(select(OcrResult)).failure_reason == "Timed out."

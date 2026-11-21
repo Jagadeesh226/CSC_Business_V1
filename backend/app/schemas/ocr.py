@@ -12,6 +12,7 @@ FieldValue = Annotated[str, StringConstraints(strip_whitespace=True, max_length=
 
 class OcrStatus(StrEnum):
     NOT_APPLICABLE = "not_applicable"  # the document type lists no OCR fields
+    NOT_STARTED = "not_started"  # never read (e.g. uploaded before OCR was set up)
     PENDING = "pending"  # queued or running
     COMPLETED = "completed"
     FAILED = "failed"  # review the document by hand

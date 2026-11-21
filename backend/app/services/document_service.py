@@ -15,6 +15,7 @@ change is audited; audit details never contain file contents or OCR values.
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.storage import get_storage
@@ -131,7 +132,7 @@ def ensure_can_review(db: Session, document: Document, user: User) -> None:
         )
 
 
-def _ensure_no_closed_job(jobs: list[Job], user: User, action: str) -> None:
+def ensure_no_closed_job(jobs: list[Job], user: User, action: str) -> None:
     """Documents of completed/cancelled jobs are a record; employees cannot
     change them (admins can, to correct mistakes)."""
     if job_service.is_admin(user):
@@ -349,7 +350,7 @@ def upload(
         job_service.ensure_job_access(db, job.id, actor)
         if job.customer_id != customer_id:
             raise BusinessRuleError("That job belongs to another customer.")
-        _ensure_no_closed_job([job], actor, "add")
+        ensure_no_closed_job([job], actor, "add")
         if checklist_item_id is not None:
             item = repo.get_checklist_item(db, checklist_item_id)
             if item is None or item.job_id != job.id:
@@ -432,7 +433,7 @@ def _queue_ocr(db: Session, document: Document, actor: User) -> None:
     saved) and keyed by document version, so it is queued once."""
     from app.workers import ocr_handler
 
-    if not ocr_handler.field_specs(db, document):
+    if not ocr_handler.wants_ocr(db, document):
         return
     document.status = DocumentStatus.PROCESSING.value
     task_queue.enqueue(
@@ -453,7 +454,7 @@ def add_version(
     ensure_can_review(db, document, actor)
     if document.archived_at is not None:
         raise BusinessRuleError("An archived document cannot get new versions.")
-    _ensure_no_closed_job(jobs, actor, "replace")
+    ensure_no_closed_job(jobs, actor, "replace")
     if document.status == DocumentStatus.REJECTED.value:
         # Reviving a rejected document must not give a single-document
         # checklist item a second live document (review L-1).
@@ -493,7 +494,7 @@ def apply_verify(db: Session, document: Document, jobs: list[Job], actor: User) 
                 else ""
             )
         )
-    _ensure_no_closed_job(jobs, actor, "verify")
+    ensure_no_closed_job(jobs, actor, "verify")
     document.status = DocumentStatus.VERIFIED.value
     document.verified_by = actor.id
     document.verified_at = _now()
@@ -504,6 +505,23 @@ def apply_verify(db: Session, document: Document, jobs: list[Job], actor: User) 
 
 def verify(db: Session, document_id: int, actor: User) -> DocumentDetail:
     document, jobs = lock_for_write(db, document_id, actor)
+    ensure_can_review(db, document, actor)
+    # A document read by OCR is verified through the OCR review, so its
+    # extracted values are always looked at (review L-6).
+    from app.models import OcrResult
+
+    pending_review = db.scalar(
+        select(OcrResult.id).where(
+            OcrResult.document_id == document.id,
+            OcrResult.document_version == document.current_version,
+            OcrResult.reviewed_at.is_(None),
+        )
+    )
+    if pending_review is not None:
+        raise BusinessRuleError(
+            "This document was read by OCR: confirm its fields in the OCR "
+            "review to verify it."
+        )
     apply_verify(db, document, jobs, actor)
     db.commit()
     return _detail(db, document)
@@ -540,7 +558,7 @@ def apply_reject(
             job_ids=[j.id for j in jobs],
         )
         return
-    _ensure_no_closed_job(jobs, actor, "reject")
+    ensure_no_closed_job(jobs, actor, "reject")
     document.status = DocumentStatus.REJECTED.value
     document.rejection_reason = reason
     document.verified_by = None
@@ -635,7 +653,7 @@ def link_document(
         raise NotFoundError(job_service.JOB_NOT_FOUND)
     job = jobs[0]
     job_service.ensure_job_access(db, job.id, actor)
-    _ensure_no_closed_job([job], actor, "add")
+    ensure_no_closed_job([job], actor, "add")
     item = repo.get_checklist_item(db, item_id)
     if item is None or item.job_id != job.id:
         raise NotFoundError("Checklist item not found.")

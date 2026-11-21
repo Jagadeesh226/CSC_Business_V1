@@ -15,7 +15,8 @@ from app.workers import notifier, registry
 from app.workers.registry import PermanentTaskError, TaskError
 from app.workers.worker import Worker, backoff_seconds
 
-TASK = "document_ocr"
+# A task type with no real handler yet, so tests can register a fake one.
+TASK = "vehicle_expiry_lookup"
 API = "/api/v1/tasks"
 
 

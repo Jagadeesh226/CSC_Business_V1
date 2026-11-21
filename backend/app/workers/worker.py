@@ -143,6 +143,7 @@ class Worker:
     def tick(self) -> int:
         """Requeue expired leases, then run every due task. Returns count."""
         self.requeue_expired()
+        self.run_maintenance()
         done = 0
         while not self._stop.is_set() and self._may_claim() and self.run_one():
             done += 1
@@ -183,10 +184,33 @@ class Worker:
     # ---------- one task ----------
 
     def requeue_expired(self) -> list[int]:
+        """Returns the ids put back in the queue. Tasks that ran out of
+        attempts this way fail, and their failure hooks run."""
         with self._sessions() as db:
-            ids = repo.requeue_expired(db)
+            rows = repo.requeue_expired(db)
             db.commit()
-        return ids
+        for row in rows:
+            if row.status == "failed":
+                info = TaskInfo(
+                    id=row.id,
+                    task_type=row.task_type,
+                    payload=row.payload,
+                    attempt=row.attempts,
+                )
+                self._run_failure_hook(info, row.last_error or "Timed out.")
+        return [r.id for r in rows if r.status == "queued"]
+
+    def run_maintenance(self) -> int:
+        fixed = 0
+        for job in registry.maintenance_jobs():
+            try:
+                with self._handler_sessions() as db:
+                    db.execute(text(f"SET LOCAL lock_timeout = {LOCK_TIMEOUT_MS}"))
+                    fixed += job(db) or 0
+                    db._worker_commit()
+            except Exception as exc:  # noqa: BLE001 - try again next loop
+                log.error("Maintenance job failed (%s).", type(exc).__name__)
+        return fixed
 
     def run_one(self, task_id: int | None = None) -> bool:
         with self._sessions() as db:
@@ -199,6 +223,7 @@ class Worker:
             task_type=row.task_type,
             payload=row.payload,
             attempt=row.attempts,
+            timeout_seconds=row.timeout_seconds,
         )
         spec = registry.get_spec(info.task_type)
         if spec is None:
@@ -270,16 +295,22 @@ class Worker:
             task.locked_by = None
             task.lease_expires_at = None
             task.updated_at = now
-            if permanent or task.attempts >= task.max_attempts:
+            final = permanent or task.attempts >= task.max_attempts
+            error = task.last_error
+            if final:
                 task.status = "failed"
                 task.finished_at = now
-                self._run_failure_hook(db, info, task.last_error)
             else:
                 task.status = "queued"
                 task.run_after = datetime.fromtimestamp(
                     now.timestamp() + backoff_seconds(task.attempts), tz=UTC
                 )
             db.commit()
+        if final:
+            # After the failure is saved, in its own transaction: it may wait
+            # for locks the timed-out handler still holds without blocking
+            # the task row.
+            self._run_failure_hook(info, error)
         log.warning(
             "Task %s (%s) attempt %s failed: %s",
             info.id,
@@ -288,16 +319,20 @@ class Worker:
             type(exc).__name__,
         )
 
-    def _run_failure_hook(self, db: Session, info: TaskInfo, error: str) -> None:
+    def _run_failure_hook(self, info: TaskInfo, error: str) -> None:
         spec = registry.get_spec(info.task_type)
         if spec is None or spec.on_final_failure is None:
             return
         try:
-            with db.begin_nested():
+            with self._handler_sessions() as db:
+                db.execute(text(f"SET LOCAL lock_timeout = {LOCK_TIMEOUT_MS}"))
                 spec.on_final_failure(db, info, error)
-        except Exception as exc:  # noqa: BLE001 - the task is still marked failed
+                db._worker_commit()
+        except Exception as exc:  # noqa: BLE001 - maintenance retries later
             log.error(
-                "Failure hook of task %s failed (%s).", info.id, type(exc).__name__
+                "Failure hook of task %s failed (%s); maintenance will retry.",
+                info.id,
+                type(exc).__name__,
             )
 
 

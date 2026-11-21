@@ -4,7 +4,11 @@ Every provider turns a file plus the list of fields a document type wants
 into an ``OcrOutput``: raw text and, per field, a value and a confidence
 (0..1). The real provider is chosen by the owner after testing candidates on
 their own sample documents (sending identity documents to a cloud service
-needs a legal/privacy review first). Until then ``OCR_PROVIDER=fake``.
+needs a legal/privacy review first).
+
+``OCR_PROVIDER`` must be set explicitly; when it is not, documents are not
+sent to OCR at all (they wait for manual review). ``fake`` is for
+development and tests only: it trusts instructions embedded in the file.
 
 Provider errors:
 - ``OcrTemporaryError``: try again later (service busy, network) -> retried.
@@ -51,8 +55,14 @@ class OcrProvider(Protocol):
     name: str
 
     def extract(
-        self, data: bytes, content_type: str, fields: list[FieldSpec]
-    ) -> OcrOutput: ...
+        self,
+        data: bytes,
+        content_type: str,
+        fields: list[FieldSpec],
+        timeout_seconds: float,
+    ) -> OcrOutput:
+        """Must give up (OcrTemporaryError) after ``timeout_seconds``."""
+        ...
 
 
 class FakeOcrProvider:
@@ -69,7 +79,11 @@ class FakeOcrProvider:
     MARKER = b"FAKEOCR:"
 
     def extract(
-        self, data: bytes, content_type: str, fields: list[FieldSpec]
+        self,
+        data: bytes,
+        content_type: str,
+        fields: list[FieldSpec],
+        timeout_seconds: float = 60,
     ) -> OcrOutput:
         script: dict = {}
         start = data.find(self.MARKER)
@@ -101,8 +115,13 @@ class FakeOcrProvider:
 _PROVIDERS = {"fake": FakeOcrProvider}
 
 
+def configured() -> bool:
+    """True when OCR_PROVIDER names a known provider."""
+    return os.getenv("OCR_PROVIDER", "") in _PROVIDERS
+
+
 def get_provider() -> OcrProvider:
-    name = os.getenv("OCR_PROVIDER", "fake")
+    name = os.getenv("OCR_PROVIDER", "")
     if name not in _PROVIDERS:
-        raise OcrUnsupportedError(f"Unknown OCR provider '{name}'.")
+        raise OcrUnsupportedError("No OCR provider is configured.")
     return _PROVIDERS[name]()

@@ -91,8 +91,9 @@ def lock_owned(db: Session, task_id: int, worker: str, attempt: int):
     )
 
 
-def requeue_expired(db: Session) -> list[int]:
-    """Tasks whose worker vanished or hung past the lease: retry or fail."""
+def requeue_expired(db: Session):
+    """Tasks whose worker vanished or hung past the lease: retry or fail.
+    Returns (id, status, task_type, payload, attempts, last_error) rows."""
     rows = db.execute(
         text(
             """
@@ -107,11 +108,11 @@ def requeue_expired(db: Session) -> list[int]:
                 run_after = now(),
                 updated_at = now()
             WHERE status = 'running' AND lease_expires_at < now()
-            RETURNING id, status
+            RETURNING id, status, task_type, payload, attempts, last_error
             """
         )
     ).all()
-    return [r.id for r in rows if r.status == "queued"]
+    return list(rows)
 
 
 def list_tasks(

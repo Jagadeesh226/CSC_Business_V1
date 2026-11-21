@@ -34,6 +34,9 @@ def upgrade() -> None:
         sa.Column("provider", sa.String(length=100), nullable=False),
         sa.Column("provider_version", sa.String(length=100), nullable=False),
         sa.Column(
+            "field_specs", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
+        sa.Column(
             "confidences", postgresql.JSONB(astext_type=sa.Text()), nullable=False
         ),
         sa.Column("extraction_sealed", sa.LargeBinary(), nullable=True),
@@ -66,12 +69,8 @@ def upgrade() -> None:
             "document_id", "document_version", name="uq_ocr_results_document_version"
         ),
     )
-    op.create_index(
-        op.f("ix_ocr_results_document_id"), "ocr_results", ["document_id"], unique=False
-    )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(op.f("ix_ocr_results_document_id"), table_name="ocr_results")
     op.drop_table("ocr_results")

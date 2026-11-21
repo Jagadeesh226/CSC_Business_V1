@@ -36,14 +36,16 @@ class OcrResult(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(
-        ForeignKey("documents.id"), nullable=False, index=True
-    )
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
     document_version: Mapped[int] = mapped_column(Integer, nullable=False)
     task_id: Mapped[int | None] = mapped_column(ForeignKey("background_tasks.id"))
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     provider: Mapped[str] = mapped_column(String(100), nullable=False)
     provider_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    # The fields asked for, frozen with the result ([{key, label, sensitive}]),
+    # so later document type edits never change how a stored result is shown
+    # or masked.
+    field_specs: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     # {field key: confidence 0..1, or null when the field was not found}
     confidences: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     # Encrypted JSON: {"fields": {key: value}, "raw_text": "..."}
