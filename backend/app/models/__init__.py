@@ -11,7 +11,8 @@ from app.models.job_document import JobDocument
 from app.models.job_fee import JobFee
 from app.models.job_status_history import JobStatusHistory
 from app.models.ocr import OcrResult
-from app.models.payment import Payment
+from app.models.payment import PAYMENT_METHODS, Payment
+from app.models.receipt import Receipt
 from app.models.sequence_counter import SequenceCounter
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
@@ -21,6 +22,7 @@ from app.models.user import User
 from app.models.user_session import UserSession
 
 __all__ = [
+    "PAYMENT_METHODS",
     "TASK_TYPES",
     "AuditLog",
     "BackgroundTask",
@@ -36,6 +38,7 @@ __all__ = [
     "JobStatusHistory",
     "OcrResult",
     "Payment",
+    "Receipt",
     "SequenceCounter",
     "Service",
     "ServiceCategory",

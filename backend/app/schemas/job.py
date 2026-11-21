@@ -4,6 +4,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.schemas.money import PaymentSummary
+
 # Matches jobs.title VARCHAR(200); surrounding whitespace is stripped first.
 JobTitle = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
@@ -167,6 +169,8 @@ class JobRead(BaseModel):
     allowed_next_statuses: list[JobStatus]
     # Always returned; optional only so older clients' schemas stay valid.
     document_progress: DocumentProgress | None = None
+    # Fees, received payments and balance; always returned.
+    payment_summary: PaymentSummary | None = None
 
 
 class JobListResponse(BaseModel):
@@ -215,3 +219,8 @@ class StatusHistoryRead(BaseModel):
     changed_by: AssigneeRef | None
     reason: str | None
     changed_at: datetime
+
+
+from app.schemas.payment import PaymentSummary
+
+JobRead.model_rebuild()
