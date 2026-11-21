@@ -35,6 +35,9 @@ class TaskInfo:
 
 
 Handler = Callable[[Session, TaskInfo], dict[str, Any] | None]
+# Called once a task has failed for good, in the worker's transaction (it
+# must not commit), e.g. to send a document to manual review.
+FailureHook = Callable[[Session, TaskInfo, str], None]
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,7 @@ class TaskSpec:
     handler: Handler
     timeout_seconds: int = 120
     max_attempts: int = 3
+    on_final_failure: FailureHook | None = None
 
 
 # Limits per task type, known to every process (the API enqueues tasks
@@ -67,10 +71,14 @@ def register(
     *,
     timeout_seconds: int | None = None,
     max_attempts: int | None = None,
+    on_final_failure: FailureHook | None = None,
 ) -> None:
     default_timeout, default_attempts = limits_for(task_type)
     _REGISTRY[task_type] = TaskSpec(
-        handler, timeout_seconds or default_timeout, max_attempts or default_attempts
+        handler,
+        timeout_seconds or default_timeout,
+        max_attempts or default_attempts,
+        on_final_failure,
     )
 
 

@@ -273,6 +273,7 @@ class Worker:
             if permanent or task.attempts >= task.max_attempts:
                 task.status = "failed"
                 task.finished_at = now
+                self._run_failure_hook(db, info, task.last_error)
             else:
                 task.status = "queued"
                 task.run_after = datetime.fromtimestamp(
@@ -286,6 +287,18 @@ class Worker:
             info.attempt,
             type(exc).__name__,
         )
+
+    def _run_failure_hook(self, db: Session, info: TaskInfo, error: str) -> None:
+        spec = registry.get_spec(info.task_type)
+        if spec is None or spec.on_final_failure is None:
+            return
+        try:
+            with db.begin_nested():
+                spec.on_final_failure(db, info, error)
+        except Exception as exc:  # noqa: BLE001 - the task is still marked failed
+            log.error(
+                "Failure hook of task %s failed (%s).", info.id, type(exc).__name__
+            )
 
 
 def main() -> None:

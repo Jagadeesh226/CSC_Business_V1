@@ -1,5 +1,6 @@
 """Imports every module that registers task handlers.
 
-The worker imports this at start-up. Handlers are added in later steps
-(document OCR in Phase 2.3).
+The worker imports this at start-up.
 """
+
+from app.workers import ocr_handler  # noqa: F401 - registers document_ocr
