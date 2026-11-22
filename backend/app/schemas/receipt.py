@@ -4,7 +4,6 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from app.schemas.fee import FeeType
 from app.schemas.job import AssigneeRef
 from app.schemas.payment import PaymentMethod
 
@@ -27,8 +26,12 @@ class SnapshotJob(BaseModel):
     service_name: str | None
 
 
+# Snapshot values are plain strings, not enums: a receipt issued before a
+# fee type or method is renamed must still load and print.
+
+
 class SnapshotFee(BaseModel):
-    fee_type: FeeType
+    fee_type: str
     description: str
     amount: Decimal
 
@@ -43,7 +46,7 @@ class ReceiptSnapshot(BaseModel):
     paid_before: Decimal
     amount: Decimal
     balance_after: Decimal
-    method: PaymentMethod
+    method: str
     reference_number: str | None
     received_by: str
 

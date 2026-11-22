@@ -1,3 +1,6 @@
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -17,6 +20,10 @@ def lock(db: Session, receipt_id: int) -> Receipt | None:
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+
+
+def _day_start(day: date) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=ZoneInfo(BUSINESS_TIMEZONE))
 
 
 def _escape_like(value: str) -> str:
@@ -42,7 +49,9 @@ def _conditions(
             or_(
                 Receipt.receipt_number.ilike(pattern, escape="\\"),
                 Job.job_number.ilike(pattern, escape="\\"),
+                # Current name and the name printed on the receipt.
                 Customer.name.ilike(pattern, escape="\\"),
+                Receipt.snapshot["customer"]["name"].astext.ilike(pattern, escape="\\"),
             )
         )
     if filters.customer_id is not None:
@@ -57,11 +66,14 @@ def _conditions(
             if filters.status.value == "cancelled"
             else Receipt.cancelled_at.is_(None)
         )
-    issued_on = func.date(func.timezone(BUSINESS_TIMEZONE, Receipt.issued_at))
+    # Whole days in the centre's calendar, as instants, so the issued_at
+    # index can be used.
     if filters.date_from is not None:
-        conditions.append(issued_on >= filters.date_from)
+        conditions.append(Receipt.issued_at >= _day_start(filters.date_from))
     if filters.date_to is not None:
-        conditions.append(issued_on <= filters.date_to)
+        conditions.append(
+            Receipt.issued_at < _day_start(filters.date_to + timedelta(days=1))
+        )
     return conditions
 
 

@@ -64,17 +64,23 @@ def get_receipt(receipt_id: Id, user: CurrentUser, db: DbSession) -> ReceiptDeta
     return receipt_service.get_receipt(db, receipt_id, user)
 
 
-@router.get(
-    "/{receipt_id}/pdf",
+@router.post(
+    "/{receipt_id}/print",
     response_class=Response,
     responses={
-        200: {"content": {"application/pdf": {}}, "description": "The receipt PDF"},
+        200: {
+            "content": {
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}}
+            },
+            "description": "The receipt PDF",
+        },
         **NOT_FOUND,
     },
 )
 def print_receipt(receipt_id: Id, user: CurrentUser, db: DbSession) -> Response:
-    """Every call is one printed copy: the first is the original, later ones
-    say DUPLICATE COPY."""
+    """Print one copy: the first is the original, every later one says
+    DUPLICATE COPY. A POST (CSRF-protected), so reloading a page, a
+    prefetch or a link from another site can never use up the original."""
     filename, pdf = receipt_service.print_receipt(db, receipt_id, user)
     return Response(
         content=pdf,

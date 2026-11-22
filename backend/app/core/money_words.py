@@ -56,6 +56,8 @@ def _below_thousand(n: int) -> str:
 
 
 def number_in_words(n: int) -> str:
+    if n < 0:
+        raise ValueError("Only amounts of zero or more can be written in words.")
     if n == 0:
         return "Zero"
     parts = []
@@ -77,6 +79,8 @@ def rupees_in_words(amount: Decimal) -> str:
     """Decimal('1250.50') -> 'Rupees One Thousand Two Hundred Fifty and
     Paise Fifty Only'."""
     value = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if value < 0:
+        raise ValueError("Only amounts of zero or more can be written in words.")
     rupees = int(value)
     paise = int((value - rupees) * 100)
     text = f"Rupees {number_in_words(rupees)}"

@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import (
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -29,6 +30,7 @@ class Receipt(Base):
     __table_args__ = (
         UniqueConstraint("receipt_number", name="uq_receipts_receipt_number"),
         UniqueConstraint("payment_id", name="uq_receipts_payment_id"),
+        Index("ix_receipts_issued_at", "issued_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

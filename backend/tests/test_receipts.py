@@ -147,9 +147,9 @@ def test_first_print_is_the_original_then_duplicates(client, make_job, db_sessio
         client, job["id"], "57.00", method="card", reference_number="AUTH7"
     )
     receipt_id = second_payment["receipt"]["id"]
-    url = f"{API}/receipts/{receipt_id}/pdf"
+    url = f"{API}/receipts/{receipt_id}/print"
 
-    original = client.get(url)
+    original = client.post(url)
     text = pdf_text(original)
     assert original.headers["cache-control"] == "no-store"
     assert (
@@ -179,7 +179,7 @@ def test_first_print_is_the_original_then_duplicates(client, make_job, db_sessio
     assert "DUPLICATE" not in text
     assert "9876543210" not in text
 
-    again = pdf_text(client.get(url))
+    again = pdf_text(client.post(url))
     assert "DUPLICATE COPY" in again
     assert client.get(f"{API}/receipts/{receipt_id}").json()["print_count"] == 2
     entries = db_session.scalars(
@@ -211,7 +211,7 @@ def test_reprint_shows_the_receipt_as_issued(client, make_job, customer):
     client.patch(
         f"{API}/jobs/{job['id']}/fees/{fees[1]['id']}", json={"amount": "60.00"}
     )
-    text = pdf_text(client.get(f"{API}/receipts/{payment['receipt']['id']}/pdf"))
+    text = pdf_text(client.post(f"{API}/receipts/{payment['receipt']['id']}/print"))
     assert "Ravi Kumar" in text and "Ravi K Kumar" not in text
     assert "Rs. 157.00" in text
 
@@ -222,7 +222,7 @@ def test_cancelled_receipt_prints_cancelled(client, make_job):
     client.post(
         f"{API}/payments/{payment['id']}/void", json={"reason": "Entered twice"}
     )
-    text = pdf_text(client.get(f"{API}/receipts/{payment['receipt']['id']}/pdf"))
+    text = pdf_text(client.post(f"{API}/receipts/{payment['receipt']['id']}/print"))
     assert "CANCELLED" in text
     assert "Reason: Entered twice" in text
     detail = client.get(f"{API}/receipts/{payment['receipt']['id']}").json()
@@ -238,7 +238,7 @@ def test_names_outside_the_builtin_font_still_print(
         json={"customer_id": hindi.id, "service_id": make_service().id, "title": "T"},
     ).json()
     payment = pay(client, job["id"], "100.00")
-    text = pdf_text(client.get(f"{API}/receipts/{payment['receipt']['id']}/pdf"))
+    text = pdf_text(client.post(f"{API}/receipts/{payment['receipt']['id']}/print"))
     assert "Kumar" in text  # unprintable letters become "?", the print works
 
 
@@ -253,7 +253,7 @@ def test_failed_render_is_not_counted(client, make_job, db_session, monkeypatch)
 
     monkeypatch.setattr(receipt_pdf, "render", broken)
     with pytest.raises(RuntimeError):
-        client.get(f"{API}/receipts/{payment['receipt']['id']}/pdf")
+        client.post(f"{API}/receipts/{payment['receipt']['id']}/print")
     db_session.rollback()
     receipt = db_session.get(Receipt, payment["receipt"]["id"])
     db_session.refresh(receipt)
@@ -275,11 +275,12 @@ def test_employees_see_only_receipts_of_their_jobs(
 
     listed = mine.get(f"{API}/receipts").json()
     assert [r["id"] for r in listed["items"]] == [my_receipt["id"]]
-    for path in ("", "/pdf"):
-        assert (
-            mine.get(f"{API}/receipts/{their_receipt['id']}{path}").status_code == 404
-        )
-    assert mine.get(f"{API}/receipts/{my_receipt['id']}/pdf").status_code == 200
+    assert mine.get(f"{API}/receipts/{their_receipt['id']}").status_code == 404
+    assert mine.post(f"{API}/receipts/{their_receipt['id']}/print").status_code == 404
+    assert mine.post(f"{API}/receipts/{my_receipt['id']}/print").status_code == 200
+    # Filters never reach into other people's jobs.
+    for params in ({"job_id": their_job["id"]}, {"search": their_job["job_number"]}):
+        assert mine.get(f"{API}/receipts", params=params).json()["total"] == 0
     # Admins see both.
     assert client.get(f"{API}/receipts").json()["total"] == 2
 
@@ -291,7 +292,7 @@ def test_employees_see_only_receipts_of_their_jobs(
 
 def test_receipts_need_sign_in(anon_client):
     assert anon_client.get(f"{API}/receipts").status_code == 401
-    assert anon_client.get(f"{API}/receipts/1/pdf").status_code == 401
+    assert anon_client.post(f"{API}/receipts/1/print").status_code == 401
 
 
 # ---------- search ----------
@@ -352,3 +353,140 @@ def test_receipt_search(client, make_job, make_customer, make_service, db_sessio
     page = client.get(f"{API}/receipts", params={"page_size": 2, "page": 2}).json()
     assert (page["total"], page["total_pages"], len(page["items"])) == (3, 2, 1)
     assert client.get(f"{API}/receipts", params={"method": "gold"}).status_code == 422
+
+
+# ---------- review fixes ----------
+
+
+def test_printing_is_a_post_with_csrf(client, make_job):
+    """Reloads, prefetches and links from other sites use GET: they must
+    never use up the original."""
+    payment = pay(client, make_job()["id"])
+    receipt_id = payment["receipt"]["id"]
+    assert client.get(f"{API}/receipts/{receipt_id}/print").status_code == 405
+    assert client.get(f"{API}/receipts/{receipt_id}/pdf").status_code == 404
+    token = client.headers.pop("X-CSRF-Token")
+    assert client.post(f"{API}/receipts/{receipt_id}/print").status_code == 403
+    client.headers["X-CSRF-Token"] = token
+    assert client.get(f"{API}/receipts/{receipt_id}").json()["print_count"] == 0
+    assert "DUPLICATE" not in pdf_text(
+        client.post(f"{API}/receipts/{receipt_id}/print")
+    )
+
+
+def test_long_text_wraps_instead_of_overlapping(
+    client, make_customer, make_service, db_session
+):
+    long_name = "Venkata " * 20 + "Subramanian"
+    customer = make_customer(name=long_name.strip(), phone="9000000003")
+    job = client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": make_service().id,
+            "title": "T",
+        },
+    ).json()
+    description = "Government portal convenience charge for online application " * 4
+    client.post(
+        f"{API}/jobs/{job['id']}/fees",
+        json={"fee_type": "third_party", "description": description, "amount": "1250"},
+    )
+    payment = pay(client, job["id"], "100.00")
+    response = client.post(f"{API}/receipts/{payment['receipt']['id']}/print")
+    text = pdf_text(response)
+    # The amount stays in its own column, whole and readable.
+    assert "Rs. 1,250.00" in text
+    assert "Subramanian" in text
+    assert len(PdfReader(io.BytesIO(response.content)).pages) == 1
+
+
+def test_marks_repeat_on_every_page(client, make_job, db_session):
+    job = make_job()
+    for n in range(40):
+        client.post(
+            f"{API}/jobs/{job['id']}/fees",
+            json={"fee_type": "third_party", "description": f"Item {n}", "amount": "1"},
+        )
+    payment = pay(client, job["id"], "10.00")
+    receipt_id = payment["receipt"]["id"]
+    voided = client.post(
+        f"{API}/payments/{payment['id']}/void", json={"reason": "x" * 1000}
+    )
+    assert voided.status_code == 200, voided.text
+    client.post(f"{API}/receipts/{receipt_id}/print")
+    reader = PdfReader(
+        io.BytesIO(client.post(f"{API}/receipts/{receipt_id}/print").content)
+    )
+    assert len(reader.pages) > 1
+    for page in reader.pages[1:]:
+        text = page.extract_text()
+        assert payment["receipt"]["receipt_number"] in text
+        assert "DUPLICATE COPY" in text and "CANCELLED" in text
+    # A very long reason is shortened on paper (kept in full in the record).
+    assert "x" * 400 not in reader.pages[0].extract_text().replace("\n", "")
+
+
+def test_missing_font_file_falls_back(client, make_job, monkeypatch):
+    monkeypatch.setattr(get_settings(), "receipt_font_path", "/nonexistent/font.ttf")
+    payment = pay(client, make_job()["id"])
+    text = pdf_text(client.post(f"{API}/receipts/{payment['receipt']['id']}/print"))
+    assert "PAYMENT RECEIPT" in text
+
+
+def test_negative_amounts_have_no_words():
+    with pytest.raises(ValueError):
+        rupees_in_words(Decimal("-5.50"))
+    with pytest.raises(ValueError):
+        number_in_words(-1)
+
+
+def test_old_receipts_load_even_if_names_change_later(client, make_job, db_session):
+    payment = pay(client, make_job()["id"])
+    receipt = db_session.get(Receipt, payment["receipt"]["id"])
+    receipt.snapshot = {
+        **receipt.snapshot,
+        "method": "demand_draft",  # a method that no longer exists
+        "fees": [{"fee_type": "stamp_duty", "description": "Old", "amount": "1.00"}],
+    }
+    db_session.flush()
+    assert client.get(f"{API}/receipts/{receipt.id}").status_code == 200
+    text = pdf_text(client.post(f"{API}/receipts/{receipt.id}/print"))
+    assert "demand_draft" in text and "stamp_duty: Old" in text
+    assert client.get(f"{API}/receipts").status_code == 200
+
+
+def test_search_finds_the_printed_and_the_current_name(client, make_job, customer):
+    payment = pay(client, make_job()["id"])
+    client.patch(f"{API}/customers/{customer.id}", json={"name": "Ravi Prakash"})
+
+    def found(term):
+        items = client.get(f"{API}/receipts", params={"search": term}).json()["items"]
+        return [i["id"] for i in items]
+
+    assert found("Ravi Kumar") == [payment["receipt"]["id"]]  # as printed
+    assert found("Prakash") == [payment["receipt"]["id"]]  # as now
+
+
+def test_date_filter_follows_the_centres_calendar(client, make_job, db_session):
+    from datetime import UTC, datetime
+
+    payment = pay(client, make_job()["id"])
+    receipt = db_session.get(Receipt, payment["receipt"]["id"])
+    # 19:00 UTC on 1 March is 00:30 on 2 March in India.
+    receipt.issued_at = datetime(2026, 3, 1, 19, 0, tzinfo=UTC)
+    db_session.flush()
+
+    def found(**params):
+        return client.get(f"{API}/receipts", params=params).json()["total"]
+
+    assert found(date_from="2026-03-02", date_to="2026-03-02") == 1
+    assert found(date_from="2026-03-01", date_to="2026-03-01") == 0
+    assert found(date_to="2026-03-01") == 0
+    assert found(date_from="2026-03-03") == 0
+
+    # Exactly midnight in India (18:30 UTC) belongs to the new day only.
+    receipt.issued_at = datetime(2026, 3, 2, 18, 30, tzinfo=UTC)
+    db_session.flush()
+    assert found(date_to="2026-03-02") == 0
+    assert found(date_from="2026-03-03", date_to="2026-03-03") == 1
