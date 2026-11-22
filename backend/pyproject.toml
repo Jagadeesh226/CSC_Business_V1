@@ -26,5 +26,6 @@ dev = [
     "ruff>=0.17.1",
 ]
 [tool.pytest.ini_options]
-pythonpath = ["."]
+# "tests" lets the whole-flow tests share tests/flow_helpers.py.
+pythonpath = [".", "tests"]
 testpaths = ["tests"]

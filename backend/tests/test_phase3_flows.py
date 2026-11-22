@@ -7,6 +7,7 @@ copy, and the admin's collections report at the end of the day.
 """
 
 import json
+from datetime import timedelta
 
 import pytest
 from flow_helpers import (
@@ -22,7 +23,9 @@ from flow_helpers import (
 )
 from sqlalchemy import select
 
+from app.core.masking import digits
 from app.models import AuditLog, Payment, Receipt
+from app.repositories.readiness_repository import business_today
 
 
 @pytest.fixture
@@ -153,14 +156,19 @@ def test_from_walk_in_to_paid_receipt(client, desk, priya, db_session):
     actions = audit(db_session, "job", job["id"])
     assert actions.count("payment_recorded") == 2
     prints = db_session.scalars(
-        select(AuditLog.details).where(AuditLog.action == "receipt_printed")
+        select(AuditLog.details)
+        .where(AuditLog.action == "receipt_printed")
+        .order_by(AuditLog.id)
     ).all()
     assert [json.loads(d)["copy"] for d in prints] == [1, 1, 2]
+    # Compared as digits only, so no spelling ("+91 98765 43210",
+    # "1234-5678-9012") can slip through.
     everything = json.dumps(db_session.scalars(select(AuditLog.details)).all())
-    for secret in ("9876543210", "1234 5678 9012", "UTR4455"):
-        assert secret not in everything
     snapshots = json.dumps(db_session.scalars(select(Receipt.snapshot)).all())
-    assert "9876543210" not in snapshots and "1234" not in snapshots
+    for stored in (everything, snapshots):
+        for secret in ("9876543210", "123456789012"):
+            assert secret not in digits(stored)
+        assert "UTR4455" not in everything
 
 
 # ---------- a shaky connection ----------
@@ -215,9 +223,17 @@ def test_wrong_amount_is_voided_and_reentered(client, desk, db_session):
     assert int(right_no[-6:]) == int(wrong_no[-6:]) + 1
     cancelled = pdf_text(desk.print_receipt(wrong["receipt"]["id"]))
     assert "CANCELLED" in cancelled and "Typed 100 instead of 10" in cancelled
+    assert wrong_no in cancelled
     assert desk.job(job["id"])["payment_summary"]["paid"] == "10.00"
 
-    report = ok(client.get(f"{API}/reports/collections"))
+    # A window around today: the void is stamped with the wall clock, so a
+    # test running across midnight in India still finds it.
+    today = business_today(db_session)
+    window = {
+        "date_from": (today - timedelta(days=1)).isoformat(),
+        "date_to": (today + timedelta(days=1)).isoformat(),
+    }
+    report = ok(client.get(f"{API}/reports/collections", params=window))
     assert report["total"] == "10.00"
     assert report["voided"] == {"count": 1, "total": "100.00"}
     assert report["voids_in_period"] == {"count": 1, "total": "100.00"}
@@ -261,6 +277,7 @@ def test_receipts_follow_the_job_when_it_is_handed_over(
     colleague_user = make_user("employee", name="Sameer Desk")
     colleague = Counter(make_client(colleague_user), catalogue["service"])
     assert colleague.print_receipt(receipt_id).status_code == 404
+    assert colleague.take_payment(job, "1.00").status_code == 404  # not yet theirs
     ok(
         client.post(
             f"{API}/jobs/{job['id']}/assignments", json={"user_id": colleague_user.id}
@@ -271,6 +288,7 @@ def test_receipts_follow_the_job_when_it_is_handed_over(
 
     assert desk.print_receipt(receipt_id).status_code == 404
     assert ok(desk.c.get(f"{API}/receipts"))["total"] == 0
+    assert desk.take_payment(job, "1.00").status_code == 404  # no longer hers
     # The colleague collects the rest and can reprint the first slip.
     assert "DUPLICATE COPY" in pdf_text(colleague.print_receipt(receipt_id))
     rest = ok(colleague.take_payment(job, "57.00"), 201)
