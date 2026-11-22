@@ -36,3 +36,15 @@ def payment_totals(
         .group_by(Payment.status, day, Payment.payment_method, Payment.recorded_by)
     ).all()
     return [tuple(r) for r in rows]
+
+
+def voids_in_period(db: Session, date_from: date, date_to: date) -> tuple[int, Decimal]:
+    """Payments voided during the period (by voided_at)."""
+    count, total = db.execute(
+        select(func.count(), func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.status == "voided",
+            Payment.voided_at >= _start(date_from),
+            Payment.voided_at < _start(date_to + timedelta(days=1)),
+        )
+    ).one()
+    return int(count), Decimal(total).quantize(Decimal("0.01"))

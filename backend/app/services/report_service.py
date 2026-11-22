@@ -12,6 +12,7 @@ from app.repositories.readiness_repository import business_today
 from app.schemas.job import AssigneeRef
 from app.schemas.payment import PaymentMethod
 from app.schemas.report import (
+    COLLECTIONS_NOTE,
     CollectionsDay,
     CollectionsMethodTotal,
     CollectionsReceiverTotal,
@@ -21,6 +22,8 @@ from app.schemas.report import (
 from app.services.errors import BusinessRuleError
 
 MAX_DAYS = 366
+# Dates outside this range are refused (and cannot overflow date maths).
+EARLIEST, LATEST = date(2000, 1, 1), date(2099, 12, 31)
 ZERO = Decimal("0.00")
 
 
@@ -40,6 +43,11 @@ def collections(
 ) -> CollectionsReport:
     date_to = date_to or business_today(db)
     date_from = date_from or date_to
+    for day in (date_from, date_to):
+        if not EARLIEST <= day <= LATEST:
+            raise BusinessRuleError(
+                f"Dates must be between {EARLIEST.isoformat()} and {LATEST.isoformat()}."
+            )
     if date_from > date_to:
         raise BusinessRuleError("date_from must be on or before date_to.")
     if (date_to - date_from).days + 1 > MAX_DAYS:
@@ -80,9 +88,18 @@ def collections(
             )
             for u, (n, t) in receivers.items()
         ),
-        key=lambda r: (-r.total, r.received_by.name if r.received_by else ""),
+        # Biggest first; ties by name then id, so the order never changes.
+        key=lambda r: (
+            -r.total,
+            r.received_by is None,
+            r.received_by.name if r.received_by else "",
+            r.received_by.id if r.received_by else 0,
+        ),
     )
+    void_count, void_total = report_repository.voids_in_period(db, date_from, date_to)
     return CollectionsReport(
+        label="Collections",
+        note=COLLECTIONS_NOTE,
         date_from=date_from,
         date_to=date_to,
         count=count,
@@ -94,4 +111,5 @@ def collections(
         ],
         by_receiver=by_receiver,
         voided=CollectionsVoided(count=voided[0], total=voided[1]),
+        voids_in_period=CollectionsVoided(count=void_count, total=void_total),
     )
