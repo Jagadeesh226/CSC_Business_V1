@@ -47,7 +47,9 @@ def work_queue(db: Session, viewer: User) -> WorkQueueSummary:
         jobs_ready_to_resume=jobs(readiness="ready_to_resume"),
         jobs_overdue=jobs(due="overdue", today=today),
         jobs_due_today=jobs(due="today", today=today),
+        jobs_with_balance_due=jobs(payment="due"),
         unassigned_jobs=jobs(unassigned=True) if employee_id is None else None,
+        jobs_overpaid=jobs(payment="overpaid") if employee_id is None else None,
     )
 
 

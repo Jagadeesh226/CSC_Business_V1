@@ -23,7 +23,9 @@ from app.models import (
     Customer,
     Job,
     JobAssignment,
+    JobFee,
     JobStatusHistory,
+    Payment,
     SequenceCounter,
     Service,
     ServiceCategory,
@@ -166,6 +168,7 @@ def _job_filters(
     due: str | None = None,
     today: date | None = None,
     unassigned: bool = False,
+    payment: str | None = None,
 ) -> tuple[list[ColumnElement[bool]], Subquery | None]:
     conditions: list[ColumnElement[bool]] = []
     if search:
@@ -205,7 +208,41 @@ def _job_filters(
                 JobAssignment.job_id == Job.id, JobAssignment.unassigned_at.is_(None)
             )
         )
+    if payment is not None:
+        conditions.append(payment_condition(payment))
     return conditions, progress
+
+
+def _fees_total() -> ColumnElement:
+    return (
+        select(func.coalesce(func.sum(JobFee.amount), 0))
+        .where(JobFee.job_id == Job.id, JobFee.deleted_at.is_(None))
+        .scalar_subquery()
+    )
+
+
+def _paid_total() -> ColumnElement:
+    return (
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.job_id == Job.id, Payment.status == "received")
+        .scalar_subquery()
+    )
+
+
+def payment_condition(payment: str) -> ColumnElement[bool]:
+    """Jobs (not cancelled) by how much of their fees is paid; see
+    ``app.schemas.job.PaymentFilter``."""
+    fees, paid = _fees_total(), _paid_total()
+    match payment:
+        case "due":
+            cond = fees > paid
+        case "paid":
+            cond = and_(fees > 0, paid == fees)
+        case "overpaid":
+            cond = paid > fees
+        case _:
+            raise ValueError(f"Unknown payment filter {payment!r}")
+    return and_(Job.status != "cancelled", cond)
 
 
 def _count(conditions, progress: Subquery | None) -> Select:

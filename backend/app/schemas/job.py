@@ -106,6 +106,15 @@ class DueFilter(StrEnum):
     TODAY = "today"
 
 
+class PaymentFilter(StrEnum):
+    """Job list filter by money (received payments against active fees).
+    Cancelled jobs never match."""
+
+    DUE = "due"  # something is still to be paid (completed jobs included)
+    PAID = "paid"  # fees fully paid
+    OVERPAID = "overpaid"  # paid more than the fees (fees lowered later)
+
+
 class JobSort(StrEnum):
     NEWEST = "newest"  # newest first (default)
     URGENCY = "urgency"  # earliest due date first, then oldest; no date last

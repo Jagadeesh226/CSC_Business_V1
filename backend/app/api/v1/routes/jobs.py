@@ -19,6 +19,7 @@ from app.schemas.job import (
     JobSort,
     JobStatus,
     JobUpdate,
+    PaymentFilter,
     Readiness,
     StatusChangeRequest,
     StatusHistoryRead,
@@ -117,6 +118,10 @@ def list_jobs(
         Query(description="Open jobs nobody is assigned to (admins)"),
     ] = False,
     sort: JobSort = JobSort.NEWEST,
+    payment: Annotated[
+        PaymentFilter | None,
+        Query(description="Money: due, fully paid or overpaid (not cancelled)"),
+    ] = None,
 ) -> JobListResponse:
     assignee_id = _parse_assigned_to(assigned_to, user)
     return job_service.list_jobs(
@@ -133,6 +138,7 @@ def list_jobs(
         readiness=readiness,
         due=due,
         unassigned=unassigned,
+        payment=payment,
         sort=sort,
     )
 

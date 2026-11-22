@@ -24,8 +24,13 @@ class WorkQueueSummary(BaseModel):
     # GET /jobs?due=overdue and ?due=today.
     jobs_overdue: int
     jobs_due_today: int
+    # GET /jobs?payment=due: jobs (completed ones too) with money to collect.
+    jobs_with_balance_due: int
     # Admins only (GET /jobs?unassigned=true); null for employees.
     unassigned_jobs: int | None
+    # Admins only (GET /jobs?payment=overpaid): paid more than the fees,
+    # to settle with the customer; null for employees.
+    jobs_overpaid: int | None
 
 
 class ReviewKind(StrEnum):
