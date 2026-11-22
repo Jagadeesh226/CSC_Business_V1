@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
@@ -30,6 +31,7 @@ class Payment(Base):
     __tablename__ = "payments"
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_payments_idempotency_key"),
+        Index("ix_payments_received_at", "received_at"),
         CheckConstraint("amount > 0", name="ck_payments_amount_positive"),
         CheckConstraint("status IN ('received', 'voided')", name="ck_payments_status"),
         CheckConstraint(

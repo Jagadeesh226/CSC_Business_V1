@@ -23,6 +23,7 @@ from app.schemas.job import (
     JobSort,
     JobStatus,
     JobUpdate,
+    PaymentFilter,
     Readiness,
     ServiceRef,
     StatusHistoryRead,
@@ -211,6 +212,7 @@ def list_jobs(
     due: DueFilter | None = None,
     unassigned: bool = False,
     sort: JobSort = JobSort.NEWEST,
+    payment: PaymentFilter | None = None,
 ) -> JobListResponse:
     search = search.strip() if search else None
     rows, total = repo.list_jobs(
@@ -228,6 +230,7 @@ def list_jobs(
         due=due.value if due is not None else None,
         today=readiness_repository.business_today(db) if due is not None else None,
         unassigned=unassigned,
+        payment=payment.value if payment is not None else None,
         sort=sort.value,
     )
     job_ids = [row[0].id for row in rows]

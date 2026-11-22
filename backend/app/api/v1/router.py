@@ -10,6 +10,7 @@ from app.api.v1.routes import (
     payments,
     queues,
     receipts,
+    reports,
     tasks,
     users,
 )
@@ -26,3 +27,4 @@ api_router.include_router(tasks.router)
 api_router.include_router(queues.router)
 api_router.include_router(payments.router)
 api_router.include_router(receipts.router)
+api_router.include_router(reports.router)
