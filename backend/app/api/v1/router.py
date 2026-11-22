@@ -9,6 +9,7 @@ from app.api.v1.routes import (
     jobs,
     payments,
     queues,
+    receipts,
     tasks,
     users,
 )
@@ -24,3 +25,4 @@ api_router.include_router(documents.router)
 api_router.include_router(tasks.router)
 api_router.include_router(queues.router)
 api_router.include_router(payments.router)
+api_router.include_router(receipts.router)
