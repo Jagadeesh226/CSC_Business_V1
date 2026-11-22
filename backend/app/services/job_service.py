@@ -1,12 +1,13 @@
 import math
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Job, JobAssignment, JobStatusHistory, User
 from app.repositories import job_repository as repo
-from app.repositories import readiness_repository, user_repository
+from app.repositories import payment_repository, readiness_repository, user_repository
 from app.repositories.job_repository import JobRow
 from app.schemas.job import (
     FINAL_STATUSES,
@@ -34,6 +35,7 @@ from app.services.errors import (
     NotFoundError,
     PermissionDeniedError,
 )
+from app.services.payment_summary import summarize
 
 JOB_NUMBER_SEQUENCE = "job_number"
 JOB_NUMBER_PREFIX = "CSC"
@@ -70,7 +72,12 @@ def _progress(counts: dict[str, int]) -> DocumentProgress:
     )
 
 
-def _to_read(row: JobRow, assignees: list[User], counts: dict[str, int]) -> JobRead:
+def _to_read(
+    row: JobRow,
+    assignees: list[User],
+    counts: dict[str, int],
+    money: tuple[Decimal, Decimal],
+) -> JobRead:
     job, customer, service = row
     return JobRead(
         id=job.id,
@@ -93,6 +100,7 @@ def _to_read(row: JobRow, assignees: list[User], counts: dict[str, int]) -> JobR
         assignees=[AssigneeRef.model_validate(u) for u in assignees],
         allowed_next_statuses=list(STATUS_TRANSITIONS.get(job.status, ())),
         document_progress=_progress(counts),
+        payment_summary=summarize(*money),
     )
 
 
@@ -105,6 +113,7 @@ def get_job(db: Session, job_id: int, viewer: User | None = None) -> JobRead:
         row,
         repo.active_assignees(db, [job_id])[job_id],
         readiness_repository.progress_for_jobs(db, [job_id])[job_id],
+        payment_repository.totals_for_jobs(db, [job_id])[job_id],
     )
 
 
@@ -224,9 +233,10 @@ def list_jobs(
     job_ids = [row[0].id for row in rows]
     assignees = repo.active_assignees(db, job_ids)
     progress = readiness_repository.progress_for_jobs(db, job_ids)
+    money = payment_repository.totals_for_jobs(db, job_ids)
     return JobListResponse(
         items=[
-            _to_read(row, assignees[i], progress[i])
+            _to_read(row, assignees[i], progress[i], money[i])
             for i, row in zip(job_ids, rows, strict=True)
         ],
         total=total,

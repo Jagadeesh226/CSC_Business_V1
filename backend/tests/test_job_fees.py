@@ -1,5 +1,6 @@
 import json
 import threading
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -69,7 +70,15 @@ def assign(client, job_id, user_id):
 
 
 def receive_payment(db_session, job_id, status="received"):
-    db_session.add(Payment(job_id=job_id, amount=Decimal("10.00"), status=status))
+    db_session.add(
+        Payment(
+            job_id=job_id,
+            amount=Decimal("10.00"),
+            payment_method="cash",
+            status=status,
+            voided_at=datetime.now(UTC) if status == "voided" else None,
+        )
+    )
     db_session.flush()
 
 
@@ -177,7 +186,7 @@ def test_employee_cannot_add_after_payment_received(
     client, employee_client, employee_user, job, db_session
 ):
     assign(client, job["id"], employee_user.id)
-    receive_payment(db_session, job["id"], status="pending")  # not received yet
+    receive_payment(db_session, job["id"], status="voided")  # does not count
     assert add(employee_client, job["id"]).status_code == 201
 
     receive_payment(db_session, job["id"])
@@ -380,7 +389,14 @@ def test_employee_fee_waits_for_payment_being_recorded(test_engine, committed_jo
         from app.repositories import job_repository
 
         job_repository.get_job_for_update(recorder, job_id)
-        recorder.add(Payment(job_id=job_id, amount=Decimal("10.00"), status="received"))
+        recorder.add(
+            Payment(
+                job_id=job_id,
+                amount=Decimal("10.00"),
+                payment_method="cash",
+                status="received",
+            )
+        )
         recorder.flush()
 
         result: dict[str, object] = {}

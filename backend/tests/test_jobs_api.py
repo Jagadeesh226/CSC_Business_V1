@@ -309,6 +309,7 @@ def test_get_job(client, customer, service):
         "assignees",
         "allowed_next_statuses",
         "document_progress",
+        "payment_summary",
     }
     assert body["customer"] == {
         "id": customer.id,
