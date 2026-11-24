@@ -4,6 +4,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.core.masking import digits, mask_phone
+from app.core.vehicle_numbers import looks_like_registration, normalize
 from app.models import Customer, User
 from app.repositories import customer_repository as repo
 from app.schemas.customer import (
@@ -59,7 +60,12 @@ def get_customer(db: Session, customer_id: int) -> CustomerRead:
 
 
 def list_customers(
-    db: Session, *, page: int, page_size: int, search: str | None = None
+    db: Session,
+    *,
+    page: int,
+    page_size: int,
+    search: str | None = None,
+    viewer: User | None = None,
 ) -> CustomerListResponse:
     name_query, phone_digits = _parse_search(search)
     if search and search.strip() and not name_query and not phone_digits:
@@ -73,6 +79,13 @@ def list_customers(
         limit=page_size,
         name_query=name_query,
         phone_digits=phone_digits,
+        registration_key=normalize(name_query)
+        if name_query and looks_like_registration(name_query)
+        else None,
+        # Employees find owners only of vehicles they may see.
+        vehicles_visible_to=viewer.id
+        if viewer is not None and viewer.role != "admin"
+        else None,
     )
     return CustomerListResponse(
         items=[_summary(c) for c in customers],

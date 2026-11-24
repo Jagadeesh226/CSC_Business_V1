@@ -20,10 +20,18 @@ from app.models.service_document_requirement import ServiceDocumentRequirement
 from app.models.service_field_definition import ServiceFieldDefinition
 from app.models.user import User
 from app.models.user_session import UserSession
+from app.models.vehicle import (
+    EXPIRY_TYPES,
+    VEHICLE_CATEGORIES,
+    Vehicle,
+    VehicleExpiry,
+)
 
 __all__ = [
+    "EXPIRY_TYPES",
     "PAYMENT_METHODS",
     "TASK_TYPES",
+    "VEHICLE_CATEGORIES",
     "AuditLog",
     "BackgroundTask",
     "Customer",
@@ -46,4 +54,6 @@ __all__ = [
     "ServiceFieldDefinition",
     "User",
     "UserSession",
+    "Vehicle",
+    "VehicleExpiry",
 ]

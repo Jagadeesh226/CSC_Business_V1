@@ -1,7 +1,8 @@
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Customer
+from app.models import Customer, Vehicle
+from app.repositories import vehicle_repository
 
 
 def get_customer(db: Session, customer_id: int) -> Customer | None:
@@ -29,13 +30,28 @@ def list_customers(
     limit: int,
     name_query: str | None,
     phone_digits: str | None,
+    registration_key: str | None = None,
+    vehicles_visible_to: int | None = None,
 ) -> tuple[list[Customer], int]:
-    """Search either by name or by phone digits, never both at once."""
+    """Search either by name or by phone digits, never both at once. A name
+    query that looks like a registration number also finds the customers
+    owning a matching vehicle."""
     conditions: list[ColumnElement[bool]] = []
     if name_query:
-        conditions.append(
-            Customer.name.ilike(f"%{_escape_like(name_query)}%", escape="\\")
-        )
+        by_name = Customer.name.ilike(f"%{_escape_like(name_query)}%", escape="\\")
+        if registration_key:
+            vehicle_match = [
+                Vehicle.customer_id == Customer.id,
+                Vehicle.registration_key.like(
+                    f"%{_escape_like(registration_key)}%", escape="\\"
+                ),
+            ]
+            if vehicles_visible_to is not None:
+                vehicle_match.append(vehicle_repository.visible_to(vehicles_visible_to))
+            by_vehicle = exists().where(*vehicle_match)
+            conditions.append(or_(by_name, by_vehicle))
+        else:
+            conditions.append(by_name)
     elif phone_digits:
         if len(phone_digits) >= 10:
             # A full number: compare the last 10 digits, ignoring +91 or 0.

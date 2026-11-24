@@ -29,11 +29,14 @@ def list_customers(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     search: Annotated[
         str | None,
-        Query(max_length=200, description="Name, or 4+ digits of the phone number"),
+        Query(
+            max_length=200,
+            description="Name, 4+ digits of the phone number, or a vehicle registration number",
+        ),
     ] = None,
 ) -> CustomerListResponse:
     return customer_service.list_customers(
-        db, page=page, page_size=page_size, search=search
+        db, page=page, page_size=page_size, search=search, viewer=user
     )
 
 
