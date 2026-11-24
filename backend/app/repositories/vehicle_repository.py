@@ -152,3 +152,15 @@ def refs_for(db: Session, vehicle_ids: set[int]) -> dict[int, Vehicle]:
     if not ids:
         return {}
     return {v.id: v for v in db.scalars(select(Vehicle).where(Vehicle.id.in_(ids)))}
+
+
+def has_open_jobs(db: Session, vehicle_id: int) -> bool:
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    Job.vehicle_id == vehicle_id, Job.status.not_in(FINAL_STATUSES)
+                )
+            )
+        )
+    )

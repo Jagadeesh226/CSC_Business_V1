@@ -46,13 +46,18 @@ def _registration(value: str) -> str:
     key = normalize(value)
     if not 4 <= len(key) <= 15:
         raise ValueError("A registration number has 4 to 15 letters and digits.")
-    return value.strip().upper()
+    if not (any(c.isalpha() for c in key) and any(c.isdigit() for c in key)):
+        raise ValueError("A registration number has both letters and digits.")
+    # Shown as typed, with spacing tidied (fits the 20-character column).
+    shown = " ".join(value.upper().split())
+    return shown if len(shown) <= 20 else key
 
 
 def _identifier(value: str) -> str:
     key = normalize(value)
-    if not 3 <= len(key) <= 25:
-        raise ValueError("Use 3 to 25 letters and digits.")
+    # At least 6, so the masked form ("****" + last 4) never shows it whole.
+    if not 6 <= len(key) <= 25:
+        raise ValueError("Use 6 to 25 letters and digits.")
     return key
 
 

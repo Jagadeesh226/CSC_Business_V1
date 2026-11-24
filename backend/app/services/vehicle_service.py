@@ -53,6 +53,10 @@ DUPLICATE = "A vehicle with this registration number already exists."
 ADMIN_ONLY_FIELDS = ("customer_id", "assigned_to", "is_active")
 
 
+def _constraint(exc: IntegrityError) -> str | None:
+    return getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+
+
 def _now(db: Session) -> datetime:
     return db.scalar(select(func.clock_timestamp()))
 
@@ -257,6 +261,8 @@ def create_vehicle(db: Session, data: VehicleCreate, actor: User) -> VehicleRead
     if data.assigned_to is not None:
         _check_user(db, data.assigned_to)
     key = normalize(data.registration_number)
+    # Uniqueness means a 409 tells the caller the number is taken somewhere;
+    # unavoidable while one vehicle is one record.
     if repo.by_key(db, key) is not None:
         raise ConflictError(DUPLICATE)
     try:
@@ -276,9 +282,11 @@ def create_vehicle(db: Session, data: VehicleCreate, actor: User) -> VehicleRead
                 created_by=actor.id,
             ),
         )
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise ConflictError(DUPLICATE) from None
+        if _constraint(exc) == "uq_vehicles_registration_key":
+            raise ConflictError(DUPLICATE) from None
+        raise
     _set_identifier(vehicle, "chassis", data.chassis_number)
     _set_identifier(vehicle, "engine", data.engine_number)
     _audit(
@@ -303,6 +311,15 @@ def update_vehicle(
     blocked = sorted(f for f in ADMIN_ONLY_FIELDS if f in changes)
     if blocked and not admin:
         raise PermissionDeniedError(f"Only an admin can change: {', '.join(blocked)}.")
+    # Changing a number you may not see would let you wipe it, or test
+    # guesses against it; only those who may see it can change it.
+    if not _can_reveal(vehicle, actor) and (
+        "chassis_number" in changes or "engine_number" in changes
+    ):
+        raise PermissionDeniedError(
+            "Only an admin or the employee responsible for this vehicle can "
+            "change its chassis and engine numbers."
+        )
     changed: list[str] = []
     if "registration_number" in changes:
         key = normalize(changes["registration_number"])
@@ -314,13 +331,27 @@ def update_vehicle(
         if changes["registration_number"] != vehicle.registration_number:
             vehicle.registration_number = changes["registration_number"]
             changed.append("registration_number")
+    moves: dict[str, dict] = {}
     if "customer_id" in changes and changes["customer_id"] != vehicle.customer_id:
         _check_customer(db, changes["customer_id"])
+        if repo.has_open_jobs(db, vehicle.id):
+            raise BusinessRuleError(
+                "Finish or unlink the open jobs for this vehicle before "
+                "moving it to another customer."
+            )
+        moves["customer_id"] = {
+            "from": vehicle.customer_id,
+            "to": changes["customer_id"],
+        }
         vehicle.customer_id = changes["customer_id"]
         changed.append("customer_id")
     if "assigned_to" in changes and changes["assigned_to"] != vehicle.assigned_to:
         if changes["assigned_to"] is not None:
             _check_user(db, changes["assigned_to"])
+        moves["assigned_to"] = {
+            "from": vehicle.assigned_to,
+            "to": changes["assigned_to"],
+        }
         vehicle.assigned_to = changes["assigned_to"]
         changed.append("assigned_to")
     for field in ("category", "owner_name", "is_active"):
@@ -343,13 +374,16 @@ def update_vehicle(
         changed.append("contact_phone")
     if changed:
         vehicle.updated_at = _now(db)
-        # Field names only: no identifier values in the audit trail.
-        _audit(db, "vehicle_updated", vehicle, actor, fields=sorted(changed))
+        # Field names only (plus who/which customer it moved between): no
+        # identifier values in the audit trail.
+        _audit(db, "vehicle_updated", vehicle, actor, fields=sorted(changed), **moves)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise ConflictError(DUPLICATE) from None
+        if _constraint(exc) == "uq_vehicles_registration_key":
+            raise ConflictError(DUPLICATE) from None
+        raise
     return _read(db, vehicle)
 
 
@@ -369,12 +403,13 @@ def set_expiry(
             raise BusinessRuleError("That document belongs to another customer.")
         source = ValueSource.DOCUMENT.value
     current = repo.current_expiry(db, vehicle.id, expiry_type.value)
-    if (
+    unchanged = (
         current is not None
         and current.valid_until == data.valid_until
         and current.source_document_id == data.document_id
-    ):
-        return _read(db, vehicle)  # nothing changed
+    )
+    if unchanged or (current is None and data.valid_until is None):
+        return _read(db, vehicle)  # nothing to record
     if current is not None:
         current.is_current = False
         db.flush()

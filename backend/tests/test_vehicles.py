@@ -121,7 +121,9 @@ def test_registration_is_unique_whatever_the_spacing(client, customer, make_cust
         {"registration_number": "GA1"},  # too short
         {"registration_number": "X" * 16},
         {"category": "tractor"},
-        {"chassis_number": "AB"},
+        {"chassis_number": "AB12C"},  # under 6: the mask would show it whole
+        {"registration_number": "TEMP"},  # needs letters and digits
+        {"registration_number": "1234"},
         {"contact_phone": "not a phone"},
         {"colour": "red"},
     ],
@@ -325,7 +327,7 @@ def test_expiries_keep_their_history(client, admin_user, customer, db_session):
     client.put(
         f"{url}/pucc", json={"valid_until": (today - timedelta(days=3)).isoformat()}
     )
-    client.put(f"{url}/permit", json={"valid_until": None})  # not applicable
+    client.put(f"{url}/permit", json={"valid_until": None})  # never set: no-op
 
     body = client.get(f"{API}/vehicles/{v['id']}").json()
     current = {
@@ -334,11 +336,10 @@ def test_expiries_keep_their_history(client, admin_user, customer, db_session):
     assert current == {
         "insurance": (renewed, 385),
         "pucc": ((today - timedelta(days=3)).isoformat(), -3),
-        "permit": (None, None),
     }
     history = client.get(f"{url}/insurance/history").json()["items"]
     assert [h["days_left"] for h in history] == [385, 20]  # newest first
-    assert actions(db_session, v["id"]).count("vehicle_expiry_set") == 4
+    assert actions(db_session, v["id"]).count("vehicle_expiry_set") == 3
     assert client.put(f"{url}/road_tax", json={"valid_until": None}).status_code == 422
 
 
@@ -438,3 +439,108 @@ def test_job_for_a_vehicle(client, customer, make_customer, make_service, db_ses
     assert client.patch(url, json={"vehicle_id": other["id"]}).status_code == 422
     assert client.patch(url, json={"vehicle_id": None}).json()["vehicle"] is None
     assert db_session.get(Job, job.json()["id"]).vehicle_id is None
+
+
+# ---------- review fixes ----------
+
+
+def test_customer_search_by_registration_respects_vehicle_access(
+    client, customer, make_user, make_client
+):
+    vehicle(client, customer.id, registration="KA 01 AB 1234")
+    desk = make_client(make_user("employee"))
+    # The employee cannot see the vehicle, so the search finds nobody.
+    assert desk.get(f"{API}/customers", params={"search": "KA01"}).json()["total"] == 0
+    own = vehicle(desk, customer.id, registration="KA 01 ZZ 9999")
+    found = desk.get(f"{API}/customers", params={"search": "KA01"}).json()
+    assert [c["id"] for c in found["items"]] == [customer.id]
+    assert own["assigned_to"] is not None
+    # Admins find owners of any vehicle.
+    assert (
+        client.get(f"{API}/customers", params={"search": "KA01AB"}).json()["total"] == 1
+    )
+
+
+def test_only_those_who_may_see_identifiers_may_change_them(
+    client, customer, make_user, make_client, make_service, db_session
+):
+    priya, sameer = make_user("employee"), make_user("employee")
+    desk, other = make_client(priya), make_client(sameer)
+    v = vehicle(desk, customer.id, chassis_number=CHASSIS)
+    # Sameer can see the vehicle through an open job, but not its numbers.
+    other.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": make_service().id,
+            "title": "T",
+        },
+    )
+    url = f"{API}/vehicles/{v['id']}"
+    for body in (
+        {"chassis_number": None},
+        {"chassis_number": CHASSIS},
+        {"engine_number": ENGINE},
+    ):
+        assert other.patch(url, json=body).status_code == 403
+    assert other.patch(url, json={"owner_name": "RAVI K"}).status_code == 200
+    assert desk.get(url, params={"reveal": "true"}).json()["chassis_number"] == CHASSIS
+    assert desk.patch(url, json={"engine_number": ENGINE}).status_code == 200
+
+
+def test_transfer_waits_for_open_jobs_and_records_the_move(
+    client, customer, make_customer, make_service, make_user, db_session
+):
+    v = vehicle(client, customer.id)
+    job = client.post(
+        f"{API}/jobs",
+        json={
+            "customer_id": customer.id,
+            "service_id": make_service().id,
+            "title": "Insurance",
+            "vehicle_id": v["id"],
+        },
+    ).json()
+    buyer = make_customer(name="New Owner")
+    url = f"{API}/vehicles/{v['id']}"
+    blocked = client.patch(url, json={"customer_id": buyer.id})
+    assert blocked.status_code == 422
+    assert "open jobs" in blocked.json()["detail"]
+
+    client.post(f"{API}/jobs/{job['id']}/cancel", json={"reason": "Sold"})
+    priya = make_user("employee")
+    moved = client.patch(url, json={"customer_id": buyer.id, "assigned_to": priya.id})
+    assert moved.status_code == 200, moved.text
+    entry = db_session.scalars(
+        select(AuditLog.details)
+        .where(AuditLog.action == "vehicle_updated")
+        .order_by(AuditLog.id.desc())
+    ).first()
+    details = json.loads(entry)
+    assert details["customer_id"] == {"from": customer.id, "to": buyer.id}
+    assert details["assigned_to"] == {"from": None, "to": priya.id}
+
+
+def test_clearing_an_unset_expiry_records_nothing(client, customer, db_session):
+    v = vehicle(client, customer.id)
+    url = f"{API}/vehicles/{v['id']}/expiries/permit"
+    assert client.put(url, json={"valid_until": None}).json()["expiries"] == []
+    assert client.get(f"{url}/history").json()["items"] == []
+    assert "vehicle_expiry_set" not in actions(db_session, v["id"])
+
+
+def test_hidden_vehicle_dates_are_out_of_reach(
+    client, customer, make_user, make_client
+):
+    v = vehicle(client, customer.id)
+    desk = make_client(make_user("employee"))
+    url = f"{API}/vehicles/{v['id']}/expiries/insurance"
+    assert desk.put(url, json={"valid_until": "2027-01-01"}).status_code == 404
+    assert desk.get(f"{url}/history").status_code == 404
+
+
+def test_long_registration_spacing_is_tidied(client, customer):
+    body = vehicle(client, customer.id, registration="KA  -  01  -  AB  -  1234")
+    assert body["registration_number"] == "KA - 01 - AB - 1234"
+    longer = vehicle(client, customer.id, registration="KA - 01 - AB - 1234 - 56")
+    assert longer["registration_number"] == "KA01AB123456"

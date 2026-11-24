@@ -36,7 +36,7 @@ def list_customers(
     ] = None,
 ) -> CustomerListResponse:
     return customer_service.list_customers(
-        db, page=page, page_size=page_size, search=search
+        db, page=page, page_size=page_size, search=search, viewer=user
     )
 
 
