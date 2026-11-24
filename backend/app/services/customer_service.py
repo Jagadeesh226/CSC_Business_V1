@@ -4,6 +4,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.core.masking import digits, mask_phone
+from app.core.vehicle_numbers import looks_like_registration, normalize
 from app.models import Customer, User
 from app.repositories import customer_repository as repo
 from app.schemas.customer import (
@@ -73,6 +74,9 @@ def list_customers(
         limit=page_size,
         name_query=name_query,
         phone_digits=phone_digits,
+        registration_key=normalize(name_query)
+        if name_query and looks_like_registration(name_query)
+        else None,
     )
     return CustomerListResponse(
         items=[_summary(c) for c in customers],

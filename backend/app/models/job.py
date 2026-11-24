@@ -37,6 +37,10 @@ class Job(Base):
         String(50), default="pending", nullable=False, index=True
     )
     due_date: Mapped[date | None] = mapped_column(Date)
+    # The customer's vehicle this job is for (RTO, insurance services).
+    vehicle_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vehicles.id", name="fk_jobs_vehicle_id"), index=True
+    )
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -5,9 +5,14 @@ from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Job, JobAssignment, JobStatusHistory, User
+from app.models import Job, JobAssignment, JobStatusHistory, User, Vehicle
 from app.repositories import job_repository as repo
-from app.repositories import payment_repository, readiness_repository, user_repository
+from app.repositories import (
+    payment_repository,
+    readiness_repository,
+    user_repository,
+    vehicle_repository,
+)
 from app.repositories.job_repository import JobRow
 from app.schemas.job import (
     FINAL_STATUSES,
@@ -23,6 +28,7 @@ from app.schemas.job import (
     JobSort,
     JobStatus,
     JobUpdate,
+    JobVehicleRef,
     PaymentFilter,
     Readiness,
     ServiceRef,
@@ -78,6 +84,7 @@ def _to_read(
     assignees: list[User],
     counts: dict[str, int],
     money: tuple[Decimal, Decimal],
+    vehicle: Vehicle | None = None,
 ) -> JobRead:
     job, customer, service = row
     return JobRead(
@@ -102,6 +109,11 @@ def _to_read(
         allowed_next_statuses=list(STATUS_TRANSITIONS.get(job.status, ())),
         document_progress=_progress(counts),
         payment_summary=summarize(*money),
+        vehicle=JobVehicleRef(
+            id=vehicle.id, registration_number=vehicle.registration_number
+        )
+        if vehicle is not None
+        else None,
     )
 
 
@@ -115,6 +127,7 @@ def get_job(db: Session, job_id: int, viewer: User | None = None) -> JobRead:
         repo.active_assignees(db, [job_id])[job_id],
         readiness_repository.progress_for_jobs(db, [job_id])[job_id],
         payment_repository.totals_for_jobs(db, [job_id])[job_id],
+        db.get(Vehicle, row[0].vehicle_id) if row[0].vehicle_id else None,
     )
 
 
@@ -136,6 +149,9 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
         raise BusinessRuleError(
             "The service's category is inactive, so it cannot be used for new jobs."
         )
+
+    if data.vehicle_id is not None:
+        _check_vehicle(db, data.vehicle_id, data.customer_id)
 
     created_by = creator.id if creator is not None else None
     # The second attempt runs only after a collision: if a job number exists
@@ -161,6 +177,7 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
                     title=data.title,
                     description=data.description,
                     due_date=data.due_date,
+                    vehicle_id=data.vehicle_id,
                     status=JobStatus.PENDING.value,
                     created_by=created_by,
                 ),
@@ -194,6 +211,14 @@ def create_job(db: Session, data: JobCreate, creator: User | None = None) -> Job
             db.rollback()
 
     raise ConflictError("The job could not be created. Please retry.")
+
+
+def _check_vehicle(db: Session, vehicle_id: int, customer_id: int) -> None:
+    vehicle = db.get(Vehicle, vehicle_id)
+    if vehicle is None or vehicle.customer_id != customer_id:
+        raise BusinessRuleError("The vehicle does not belong to this customer.")
+    if not vehicle.is_active:
+        raise BusinessRuleError("The vehicle is inactive.")
 
 
 def list_jobs(
@@ -237,9 +262,16 @@ def list_jobs(
     assignees = repo.active_assignees(db, job_ids)
     progress = readiness_repository.progress_for_jobs(db, job_ids)
     money = payment_repository.totals_for_jobs(db, job_ids)
+    vehicles = vehicle_repository.refs_for(db, {row[0].vehicle_id for row in rows})
     return JobListResponse(
         items=[
-            _to_read(row, assignees[i], progress[i], money[i])
+            _to_read(
+                row,
+                assignees[i],
+                progress[i],
+                money[i],
+                vehicles.get(row[0].vehicle_id),
+            )
             for i, row in zip(job_ids, rows, strict=True)
         ],
         total=total,
@@ -265,6 +297,8 @@ def update_job(
         for field, value in data.model_dump(exclude_unset=True).items()
         if getattr(job, field) != value
     }
+    if changed.get("vehicle_id") is not None:
+        _check_vehicle(db, changed["vehicle_id"], job.customer_id)
     for field, value in changed.items():
         setattr(job, field, value)
     if changed:

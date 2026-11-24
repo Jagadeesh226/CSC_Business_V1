@@ -62,16 +62,20 @@ class JobCreate(BaseModel):
     title: JobTitle
     description: JobDescription | None = None
     due_date: date | None = None
+    # One of this customer's vehicles (e.g. for RTO or insurance services).
+    vehicle_id: ResourceId | None = None
 
 
 class JobUpdate(BaseModel):
-    """Partial update. Only title, description and due_date may change."""
+    """Partial update: title, description, due_date and the vehicle
+    (null unlinks it)."""
 
     model_config = ConfigDict(extra="forbid")
 
     title: JobTitle | None = None
     description: JobDescription | None = None
     due_date: date | None = None
+    vehicle_id: ResourceId | None = None
 
     @model_validator(mode="after")
     def title_not_null(self) -> "JobUpdate":
@@ -150,6 +154,11 @@ class ServiceRef(BaseModel):
     code: str
 
 
+class JobVehicleRef(BaseModel):
+    id: int
+    registration_number: str
+
+
 class AssigneeRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -180,6 +189,8 @@ class JobRead(BaseModel):
     document_progress: DocumentProgress | None = None
     # Fees, received payments and balance; always returned.
     payment_summary: PaymentSummary | None = None
+    # The vehicle the job is for, if any.
+    vehicle: JobVehicleRef | None = None
 
 
 class JobListResponse(BaseModel):
