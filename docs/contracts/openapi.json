@@ -378,6 +378,15 @@
         "title": "CategoryUpdate",
         "type": "object"
       },
+      "ChallanStatus": {
+        "enum": [
+          "unknown",
+          "none",
+          "pending"
+        ],
+        "title": "ChallanStatus",
+        "type": "string"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1763,6 +1772,143 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "ExpiryHistoryResponse": {
+        "properties": {
+          "expiry_type": {
+            "$ref": "#/components/schemas/ExpiryType"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExpiryRead"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expiry_type",
+          "items"
+        ],
+        "title": "ExpiryHistoryResponse",
+        "type": "object"
+      },
+      "ExpiryRead": {
+        "properties": {
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expiry_type": {
+            "$ref": "#/components/schemas/ExpiryType"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "recorded_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/ValueSource"
+          },
+          "source_document_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Document Id"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          }
+        },
+        "required": [
+          "expiry_type",
+          "valid_until",
+          "days_left",
+          "source",
+          "source_document_id",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "title": "ExpiryRead",
+        "type": "object"
+      },
+      "ExpirySet": {
+        "additionalProperties": false,
+        "description": "Set (or clear, with null) the current date of one expiry type.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          }
+        },
+        "required": [
+          "valid_until"
+        ],
+        "title": "ExpirySet",
+        "type": "object"
+      },
+      "ExpiryType": {
+        "enum": [
+          "insurance",
+          "pucc",
+          "fitness",
+          "tax",
+          "permit"
+        ],
+        "title": "ExpiryType",
+        "type": "string"
+      },
       "FeeCreate": {
         "additionalProperties": false,
         "properties": {
@@ -2033,6 +2179,19 @@
             "minLength": 1,
             "title": "Title",
             "type": "string"
+          },
+          "vehicle_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehicle Id"
           }
         },
         "required": [
@@ -2182,6 +2341,16 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobVehicleRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2224,7 +2393,7 @@
       },
       "JobUpdate": {
         "additionalProperties": false,
-        "description": "Partial update. Only title, description and due_date may change.",
+        "description": "Partial update: title, description, due_date and the vehicle\n(null unlinks it).",
         "properties": {
           "description": {
             "anyOf": [
@@ -2262,9 +2431,40 @@
               }
             ],
             "title": "Title"
+          },
+          "vehicle_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehicle Id"
           }
         },
         "title": "JobUpdate",
+        "type": "object"
+      },
+      "JobVehicleRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "registration_number": {
+            "title": "Registration Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "registration_number"
+        ],
+        "title": "JobVehicleRef",
         "type": "object"
       },
       "LinkDocumentRequest": {
@@ -4632,6 +4832,426 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValueSource": {
+        "enum": [
+          "manual",
+          "document",
+          "lookup"
+        ],
+        "title": "ValueSource",
+        "type": "string"
+      },
+      "VehicleCategory": {
+        "enum": [
+          "two_wheeler",
+          "private_four_wheeler",
+          "commercial",
+          "other"
+        ],
+        "title": "VehicleCategory",
+        "type": "string"
+      },
+      "VehicleCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "category": {
+            "$ref": "#/components/schemas/VehicleCategory"
+          },
+          "chassis_number": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chassis Number"
+          },
+          "contact_phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Phone"
+          },
+          "customer_id": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2147483647.0,
+            "title": "Customer Id",
+            "type": "integer"
+          },
+          "engine_number": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Number"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "registration_number": {
+            "maxLength": 30,
+            "title": "Registration Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "registration_number",
+          "category"
+        ],
+        "title": "VehicleCreate",
+        "type": "object"
+      },
+      "VehicleCustomerRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VehicleCustomerRef",
+        "type": "object"
+      },
+      "VehicleListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VehicleRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "VehicleListResponse",
+        "type": "object"
+      },
+      "VehicleRead": {
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "$ref": "#/components/schemas/VehicleCategory"
+          },
+          "challan_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challan Checked At"
+          },
+          "challan_status": {
+            "$ref": "#/components/schemas/ChallanStatus"
+          },
+          "chassis_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chassis Number"
+          },
+          "contact_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Phone"
+          },
+          "contact_phone_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/VehicleCustomerRef"
+          },
+          "engine_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Number"
+          },
+          "expiries": {
+            "items": {
+              "$ref": "#/components/schemas/ExpiryRead"
+            },
+            "title": "Expiries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "identifiers_masked": {
+            "title": "Identifiers Masked",
+            "type": "boolean"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "registration_number": {
+            "title": "Registration Number",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customer",
+          "registration_number",
+          "category",
+          "owner_name",
+          "chassis_number",
+          "engine_number",
+          "identifiers_masked",
+          "assigned_to",
+          "contact_phone",
+          "contact_phone_source",
+          "challan_status",
+          "challan_checked_at",
+          "is_active",
+          "created_at",
+          "updated_at",
+          "expiries"
+        ],
+        "title": "VehicleRead",
+        "type": "object"
+      },
+      "VehicleUpdate": {
+        "additionalProperties": false,
+        "description": "Partial update. Owner name, chassis, engine and contact phone can be\ncleared with null. Admins only: customer_id (ownership transfer),\nassigned_to and is_active.",
+        "properties": {
+          "assigned_to": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned To"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chassis_number": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chassis Number"
+          },
+          "contact_phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Phone"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 2147483647.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "engine_number": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Number"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "registration_number": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Number"
+          }
+        },
+        "title": "VehicleUpdate",
+        "type": "object"
+      },
       "VoidRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4951,7 +5571,7 @@
             }
           },
           {
-            "description": "Name, or 4+ digits of the phone number",
+            "description": "Name, 4+ digits of the phone number, or a vehicle registration number",
             "in": "query",
             "name": "search",
             "required": false,
@@ -4965,7 +5585,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Name, or 4+ digits of the phone number",
+              "description": "Name, 4+ digits of the phone number, or a vehicle registration number",
               "title": "Search"
             }
           }
@@ -10779,6 +11399,605 @@
         "summary": "Reset Password",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/v1/vehicles": {
+      "get": {
+        "operationId": "list_vehicles_api_v1_vehicles_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Registration number (any spacing), owner or customer name",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Registration number (any spacing), owner or customer name",
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assigned_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/VehicleCategory"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "description": "Default: active only; omit with null",
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": true,
+              "description": "Default: active only; omit with null",
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Vehicles",
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "post": {
+        "operationId": "create_vehicle_api_v1_vehicles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed for this user"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Customer not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Registration number in use"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Vehicle",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicle_id}": {
+      "get": {
+        "operationId": "get_vehicle_api_v1_vehicles__vehicle_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Show full chassis and engine numbers (admin or the responsible employee; audited)",
+            "in": "query",
+            "name": "reveal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Show full chassis and engine numbers (admin or the responsible employee; audited)",
+              "title": "Reveal",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed to reveal"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Vehicle not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Vehicle",
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "patch": {
+        "operationId": "update_vehicle_api_v1_vehicles__vehicle_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed for this user"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Vehicle not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Registration number in use"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Vehicle",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicle_id}/expiries/{expiry_type}": {
+      "put": {
+        "description": "Set (or clear with null) the current date; the old one stays in the\nhistory.",
+        "operationId": "set_expiry_api_v1_vehicles__vehicle_id__expiries__expiry_type__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "expiry_type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ExpiryType"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpirySet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Vehicle not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Expiry",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicle_id}/expiries/{expiry_type}/history": {
+      "get": {
+        "operationId": "expiry_history_api_v1_vehicles__vehicle_id__expiries__expiry_type__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "expiry_type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ExpiryType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiryHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Vehicle not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Expiry History",
+        "tags": [
+          "vehicles"
         ]
       }
     },
