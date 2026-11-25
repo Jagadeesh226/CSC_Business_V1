@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.whatsapp import link, renewal_message, whatsapp_number
+from app.core.whatsapp import describe, link, renewal_message, whatsapp_number
 from app.models import (
     Customer,
     DailyRun,
@@ -90,7 +90,7 @@ def _notify(
             user_id=user.id,
             kind="vehicle_expiry",
             reminder_id=reminder_id,
-            title=f"{vehicle.registration_number}: {label} expires in {days} days",
+            title=f"{vehicle.registration_number}: {describe(label, valid_until, days)}",
             body=(
                 f"{label} for {vehicle.registration_number} ({customer.name}) "
                 f"expires on {valid_until.strftime('%d-%m-%Y')}."
@@ -103,7 +103,28 @@ def _notify(
 def _ensure(
     db: Session, vehicle: Vehicle, expiry_type: str, valid_until: date, today: date
 ) -> bool:
-    """One reminder (and notification) for this expiry. True if new."""
+    """One reminder (and notification) for this expiry. True if new.
+
+    Re-checks, under a share lock on the vehicle (date changes take an
+    update lock on it), that the date is still current: a date changed
+    meanwhile never gets a stale reminder back."""
+    db.execute(
+        select(Vehicle.id).where(Vehicle.id == vehicle.id).with_for_update(read=True)
+    )
+    still_current = db.scalar(
+        select(
+            exists().where(
+                VehicleExpiry.vehicle_id == Vehicle.id,
+                VehicleExpiry.expiry_type == expiry_type,
+                VehicleExpiry.valid_until == valid_until,
+                VehicleExpiry.is_current.is_(True),
+                Vehicle.id == vehicle.id,
+                Vehicle.is_active.is_(True),
+            )
+        )
+    )
+    if not still_current:
+        return False
     created = db.scalar(
         insert(VehicleReminder)
         .values(
@@ -134,6 +155,33 @@ def _ensure(
     customer = db.get(Customer, vehicle.customer_id)
     _notify(db, created, vehicle, customer, expiry_type, valid_until, today)
     return True
+
+
+def notify_responsible(
+    db: Session, vehicle: Vehicle, previous: int | None = None
+) -> None:
+    """The vehicle's responsible employee gets a notification for each of
+    its open reminders (once each). Called when the responsible person
+    changes; the previous one's notifications for them are settled."""
+    today = business_today(db)
+    open_reminders = db.scalars(
+        select(VehicleReminder).where(
+            VehicleReminder.vehicle_id == vehicle.id, VehicleReminder.status == "open"
+        )
+    ).all()
+    if previous is not None and previous != vehicle.assigned_to:
+        db.execute(
+            update(Notification)
+            .where(
+                Notification.user_id == previous,
+                Notification.reminder_id.in_([r.id for r in open_reminders]),
+                Notification.read_at.is_(None),
+            )
+            .values(read_at=func.now())
+        )
+    customer = db.get(Customer, vehicle.customer_id)
+    for r in open_reminders:
+        _notify(db, r.id, vehicle, customer, r.expiry_type, r.valid_until, today)
 
 
 def _supersede(db: Session, condition, reason: str) -> int:
@@ -183,6 +231,9 @@ def run_daily(db: Session) -> int:
     the window and retire ones whose date or vehicle changed. Returns how
     many reminders were created (0 if today's run already happened)."""
     today = business_today(db)
+    # Another worker is doing it right now: don't wait on its lock.
+    if not db.scalar(select(func.pg_try_advisory_xact_lock(func.hashtext(DAILY_JOB)))):
+        return 0
     claimed = db.scalar(
         insert(DailyRun)
         .values(name=DAILY_JOB, business_date=today)
@@ -216,7 +267,33 @@ def run_daily(db: Session) -> int:
         )
         .order_by(Vehicle.id, VehicleExpiry.expiry_type)
     ).all()
-    return sum(_ensure(db, v, kind, until, today) for v, kind, until in due)
+    created = sum(_ensure(db, v, kind, until, today) for v, kind, until in due)
+    # Open reminders whose responsible employee has no notification yet
+    # (e.g. the vehicle was assigned after the reminder was made).
+    missing = db.execute(
+        select(VehicleReminder, Vehicle)
+        .join(Vehicle, Vehicle.id == VehicleReminder.vehicle_id)
+        .where(
+            VehicleReminder.status == "open",
+            Vehicle.assigned_to.is_not(None),
+            ~exists().where(
+                Notification.reminder_id == VehicleReminder.id,
+                Notification.user_id == Vehicle.assigned_to,
+            ),
+        )
+    ).all()
+    for reminder, vehicle in missing:
+        customer = db.get(Customer, vehicle.customer_id)
+        _notify(
+            db,
+            reminder.id,
+            vehicle,
+            customer,
+            reminder.expiry_type,
+            reminder.valid_until,
+            today,
+        )
+    return created
 
 
 # ---------- reading ----------
@@ -459,6 +536,16 @@ def _bucket_condition(bucket: ExpiryBucket, today: date):
     }[bucket]
 
 
+def _row_link(expiry, days: int, vehicle_link, own_link, open_keys) -> str | None:
+    """Due rows (an open reminder) share the vehicle's message; expired rows
+    get a message about that expiry alone; rows over 30 days get none."""
+    if (expiry.vehicle_id, expiry.expiry_type, expiry.valid_until) in open_keys:
+        return vehicle_link
+    if days < 0:
+        return own_link
+    return None
+
+
 def list_expiries(
     db: Session,
     viewer: User,
@@ -507,6 +594,15 @@ def list_expiries(
     ).all()
     pairs = {v.id: (v, c) for _, v, c in rows}
     links = _links(db, list(pairs.values()), today)
+    open_keys = {
+        (r.vehicle_id, r.expiry_type, r.valid_until)
+        for r in db.scalars(
+            select(VehicleReminder).where(
+                VehicleReminder.vehicle_id.in_(list(pairs)),
+                VehicleReminder.status == "open",
+            )
+        )
+    }
     centre = get_settings().centre_name
     items = []
     for expiry, vehicle, customer in rows:
@@ -535,7 +631,9 @@ def list_expiries(
                 valid_until=expiry.valid_until,
                 days_left=days,
                 bucket=_bucket(days),
-                whatsapp_link=links.get(vehicle.id) or own_link,
+                whatsapp_link=_row_link(
+                    expiry, days, links.get(vehicle.id), own_link, open_keys
+                ),
             )
         )
     return ExpiryListResponse(

@@ -10,6 +10,7 @@ from app.schemas.reminder import (
     DoneRequest,
     ExpiryBucket,
     ExpiryListResponse,
+    MarkedResponse,
     NotificationListResponse,
     ReminderListResponse,
     ReminderRead,
@@ -107,12 +108,13 @@ def list_notifications(
 
 @router.post(
     "/notifications/{notification_id}/read",
+    response_model=MarkedResponse,
     responses={404: {"model": ErrorResponse, "description": "Notification not found"}},
 )
-def mark_read(notification_id: Id, user: CurrentUser, db: DbSession) -> dict[str, int]:
-    return {"marked": reminder_service.mark_read(db, user, notification_id)}
+def mark_read(notification_id: Id, user: CurrentUser, db: DbSession) -> MarkedResponse:
+    return MarkedResponse(marked=reminder_service.mark_read(db, user, notification_id))
 
 
-@router.post("/notifications/read-all")
-def mark_all_read(user: CurrentUser, db: DbSession) -> dict[str, int]:
-    return {"marked": reminder_service.mark_read(db, user, None)}
+@router.post("/notifications/read-all", response_model=MarkedResponse)
+def mark_all_read(user: CurrentUser, db: DbSession) -> MarkedResponse:
+    return MarkedResponse(marked=reminder_service.mark_read(db, user, None))

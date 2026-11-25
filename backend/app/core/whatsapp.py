@@ -11,13 +11,15 @@ from app.core.masking import digits
 
 
 def whatsapp_number(phone: str | None) -> str | None:
-    """'+91 98765 43210', '098765 43210', '9876543210' -> '919876543210'.
-    Only Indian mobile numbers (10 digits starting 6-9) get a link."""
+    """'+91 98765 43210', '9876543210' -> '919876543210'.
+
+    Only Indian mobile numbers (10 digits starting 6-9, optionally with 91)
+    get a link. Numbers written with a leading 0 are refused: "080 2345
+    6789" (a landline with its STD code) looks exactly like a mobile, and a
+    wrong guess would send a customer's details to a stranger."""
     d = digits(phone)
     if len(d) == 12 and d.startswith("91"):
         d = d[2:]
-    elif len(d) == 11 and d.startswith("0"):
-        d = d[1:]
     if len(d) == 10 and d[0] in "6789":
         return "91" + d
     return None

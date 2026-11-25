@@ -122,3 +122,7 @@ class NotificationListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class MarkedResponse(BaseModel):
+    marked: int  # how many notifications became read

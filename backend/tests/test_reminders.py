@@ -24,7 +24,10 @@ API = "/api/v1"
     "phone, number",
     [
         ("+91 98765 43210", "919876543210"),
-        ("098765 43210", "919876543210"),
+        ("098765 43210", None),  # leading 0: could be an STD landline
+        ("080 2345 6789", None),  # Bengaluru landline
+        ("0612 234 5678", None),  # Patna landline
+        ("0712-2345678", None),  # Nagpur landline
         ("9876543210", "919876543210"),
         ("919876543210", "919876543210"),
         ("5876543210", None),  # not a mobile
@@ -132,7 +135,8 @@ def test_date_within_30_days_reminds_the_responsible_employee(
     assert text.endswith(f"- {get_settings().centre_name}")
 
     [n] = desk.get(f"{API}/notifications").json()["items"]
-    assert n["title"] == "GA 07 AB 1234: Insurance expires in 20 days"
+    due = (today + timedelta(days=20)).strftime("%d-%m-%Y")
+    assert n["title"] == f"GA 07 AB 1234: Insurance expires on {due} (20 days left)"
     assert n["reminder_id"] == r["id"] and n["read_at"] is None
     summary = desk.get(f"{API}/work-queue").json()
     assert (summary["reminders_to_send"], summary["unread_notifications"]) == (1, 1)
@@ -320,8 +324,10 @@ def test_daily_check_retires_stale_reminders(
 
 
 def test_daily_check_runs_in_the_real_worker(desk, customer, today, db_session):
-    import app.workers.handlers  # noqa: F401 - registers jobs, as the worker does
     from app.workers import registry
+
+    before = registry.maintenance_jobs()
+    import app.workers.handlers  # noqa: F401 - registers jobs, as the worker does
 
     assert reminder_service.run_daily in registry.maintenance_jobs()
     v = add_vehicle(desk, customer.id)
@@ -330,7 +336,11 @@ def test_daily_check_runs_in_the_real_worker(desk, customer, today, db_session):
     db_session.query(Notification).delete()
     db_session.query(VehicleReminder).delete()
     db_session.flush()
-    run_worker(db_session, expect=0)  # maintenance runs on every tick
+    try:
+        run_worker(db_session, expect=0)  # maintenance runs on every tick
+    finally:
+        # Leave the registry as other tests expect it.
+        registry._MAINTENANCE[:] = before
     assert len(db_session.scalars(select(VehicleReminder)).all()) == 1
     assert db_session.scalar(select(DailyRun)).business_date == today
 
@@ -464,3 +474,108 @@ def test_bucket_edges(desk, customer, today, offset, bucket):
     for name in ("expired", "0_7", "8_15", "16_30", "over_30"):
         filtered = desk.get(f"{API}/vehicle-expiries", params={"bucket": name}).json()
         assert filtered["total"] == (1 if name == bucket else 0), name
+
+
+# ---------- review fixes ----------
+
+
+def test_assigning_a_vehicle_later_notifies_the_new_person(
+    client, priya, desk, customer, make_user, make_client, today, db_session
+):
+    v = add_vehicle(client, customer.id)  # an admin's vehicle: nobody yet
+    set_date(client, v["id"], "insurance", today + timedelta(days=5))
+    assert db_session.scalars(select(Notification)).all() == []
+
+    client.patch(f"{API}/vehicles/{v['id']}", json={"assigned_to": priya.id})
+    [n] = desk.get(f"{API}/notifications").json()["items"]
+    assert n["title"].startswith("GA 07 AB 1234: Insurance expires on")
+
+    sameer = make_user("employee", name="Sameer")
+    client.patch(f"{API}/vehicles/{v['id']}", json={"assigned_to": sameer.id})
+    assert make_client(sameer).get(f"{API}/notifications").json()["unread"] == 1
+    # Priya's is settled: the vehicle is no longer hers to chase.
+    assert desk.get(f"{API}/notifications").json()["unread"] == 0
+
+
+def test_daily_check_backfills_missing_notifications(
+    client, priya, desk, customer, today, db_session, monkeypatch
+):
+    v = add_vehicle(client, customer.id)
+    set_date(client, v["id"], "insurance", today + timedelta(days=5))
+    # Assigned without going through the API (e.g. a data fix).
+    from app.models import Vehicle
+
+    db_session.get(Vehicle, v["id"]).assigned_to = priya.id
+    db_session.flush()
+    monkeypatch.setattr(reminder_service, "business_today", lambda db: today)
+    reminder_service.run_daily(db_session)
+    assert desk.get(f"{API}/notifications").json()["unread"] == 1
+
+
+def test_expiry_row_links_match_the_row(desk, customer, today):
+    v = add_vehicle(desk, customer.id)
+    set_date(desk, v["id"], "insurance", today + timedelta(days=5))
+    set_date(desk, v["id"], "pucc", today + timedelta(days=200))
+    set_date(desk, v["id"], "tax", today - timedelta(days=3))
+    rows = {
+        i["expiry_type"]: i for i in desk.get(f"{API}/vehicle-expiries").json()["items"]
+    }
+
+    def text(item):
+        return parse_qs(urlparse(item["whatsapp_link"]).query)["text"][0]
+
+    assert "Insurance expires on" in text(rows["insurance"])
+    assert rows["pucc"]["whatsapp_link"] is None  # nothing to chase yet
+    tax = text(rows["tax"])
+    assert "Road tax expired on" in tax and "Insurance" not in tax
+
+
+def test_notification_wording(desk, customer, today):
+    v = add_vehicle(desk, customer.id)
+    set_date(desk, v["id"], "permit", today)
+    set_date(desk, v["id"], "tax", today + timedelta(days=1))
+    titles = sorted(
+        n["title"] for n in desk.get(f"{API}/notifications").json()["items"]
+    )
+    assert titles[0].endswith(
+        "Permit expires today (" + today.strftime("%d-%m-%Y") + ")"
+    )
+    assert titles[1].endswith("(1 day left)")
+
+
+def test_a_stale_date_never_gets_a_reminder(desk, customer, today, db_session):
+    v = add_vehicle(desk, customer.id)
+    set_date(desk, v["id"], "insurance", today + timedelta(days=200))
+    from app.models import Vehicle
+
+    vehicle = db_session.get(Vehicle, v["id"])
+    # A date that is not (or no longer) the current one is ignored.
+    assert (
+        reminder_service._ensure(
+            db_session, vehicle, "insurance", today + timedelta(days=5), today
+        )
+        is False
+    )
+    assert db_session.scalars(select(VehicleReminder)).all() == []
+
+
+def test_done_reminder_is_not_reopened(desk, customer, today, db_session):
+    v = add_vehicle(desk, customer.id)
+    when = today + timedelta(days=5)
+    set_date(desk, v["id"], "insurance", when)
+    [r] = reminders(desk)["items"]
+    desk.post(f"{API}/reminders/{r['id']}/done", json={})
+    set_date(desk, v["id"], "insurance", when + timedelta(days=1))
+    set_date(desk, v["id"], "insurance", when)  # back again
+    statuses = sorted(
+        (x.valid_until, x.status) for x in db_session.scalars(select(VehicleReminder))
+    )
+    assert statuses == [(when, "done"), (when + timedelta(days=1), "superseded")]
+
+
+def test_mark_read_response_is_typed():
+    from app.main import app
+
+    spec = app.openapi()["paths"]["/api/v1/notifications/read-all"]["post"]
+    schema = spec["responses"]["200"]["content"]["application/json"]["schema"]
+    assert schema == {"$ref": "#/components/schemas/MarkedResponse"}

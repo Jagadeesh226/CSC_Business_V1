@@ -377,6 +377,11 @@ def update_vehicle(
             ValueSource.MANUAL.value if changes["contact_phone"] else None
         )
         changed.append("contact_phone")
+    if "assigned_to" in changed:
+        db.flush()
+        reminder_service.notify_responsible(
+            db, vehicle, previous=moves["assigned_to"]["from"]
+        )
     if "is_active" in changed:
         # Inactive vehicles have no open reminders; reactivating brings
         # back the ones now due.
