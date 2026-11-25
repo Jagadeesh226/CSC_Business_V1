@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Response
 
 from app.core.dependencies import AUTH_RESPONSES, AdminUser, CurrentUser, DbSession
-from app.schemas.error import ErrorResponse
 from app.schemas.job import MAX_DB_INT
 from app.schemas.report import CollectionsReport
 from app.services import export_service, report_service
@@ -40,7 +39,19 @@ def collections(
             },
             "description": "The vehicles spreadsheet",
         },
-        422: {"model": ErrorResponse, "description": "Too many rows; filter further"},
+        422: {
+            "description": "Invalid filters, or too many rows (filter further)",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "anyOf": [
+                            {"$ref": "#/components/schemas/HTTPValidationError"},
+                            {"$ref": "#/components/schemas/ErrorResponse"},
+                        ]
+                    }
+                }
+            },
+        },
     },
 )
 def vehicles_export(
@@ -57,6 +68,13 @@ def vehicles_export(
     ] = None,
     include_inactive: bool = False,
     customer_id: Annotated[int | None, Query(gt=0, le=MAX_DB_INT)] = None,
+    include_whatsapp: Annotated[
+        bool,
+        Query(
+            description="Add the WhatsApp column (its links carry the full mobile "
+            "number)"
+        ),
+    ] = True,
 ) -> Response:
     """Vehicles with their expiry dates and a WhatsApp link per row
     (chassis, engine and mobile masked). Employees get the vehicles they
@@ -67,6 +85,7 @@ def vehicles_export(
         due_within_days=due_within_days,
         include_inactive=include_inactive,
         customer_id=customer_id,
+        include_whatsapp=include_whatsapp,
     )
     return Response(
         content=data,

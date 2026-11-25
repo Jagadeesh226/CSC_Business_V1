@@ -195,6 +195,7 @@ def test_export_is_audited(client, admin_user, customer, db_session):
         "due_within_days": 30,
         "include_inactive": False,
         "customer_id": None,
+        "include_whatsapp": True,
     }
 
 
@@ -209,3 +210,80 @@ def test_too_many_rows_asks_for_filters(client, customer, monkeypatch):
 
 def test_export_needs_sign_in(anon_client):
     assert anon_client.get(URL).status_code == 401
+
+
+# ---------- review fixes ----------
+
+
+def test_control_characters_never_break_the_export(client, make_customer, today):
+    odd = make_customer(name="Ravi\x0bKumar", phone="+91 98765 43210")
+    v = add_vehicle(client, odd.id, owner_name="X\x01Y\x0cZ")
+    set_date(client, v["id"], "insurance", today + timedelta(days=3))
+    _, [row], _ = sheet(client.get(URL))
+    assert row["Customer name"].value == "RaviKumar"
+    assert row["Owner name (RC)"].value == "XYZ"
+
+
+def test_no_formula_anywhere_in_the_file(client, make_customer):
+    import zipfile
+
+    evil = make_customer(name="=1+1", phone=None)
+    add_vehicle(client, evil.id, owner_name="@SUM(A1)")
+    content = client.get(URL).content
+    with zipfile.ZipFile(io.BytesIO(content)) as z:
+        for name in z.namelist():
+            if name.startswith("xl/worksheets/"):
+                assert b"<f>" not in z.read(name) and b"<f " not in z.read(name)
+
+
+def test_export_details_sheet(client, admin_user, customer):
+    add_vehicle(client, customer.id)
+    wb = load_workbook(
+        io.BytesIO(client.get(URL, params={"due_within_days": 7}).content)
+    )
+    assert wb.sheetnames == ["Vehicles", "About"]
+    about = {r[0].value: r[1].value for r in wb["About"].iter_rows()}
+    assert about["Exported by"] == "Admin Test"
+    assert about["Vehicles"] == 0
+    assert about["Due within days"] == 7
+
+
+def test_whatsapp_column_can_be_left_out(client, customer, today, db_session):
+    v = add_vehicle(client, customer.id)
+    set_date(client, v["id"], "insurance", today + timedelta(days=3))
+    headers, [_], ws = sheet(client.get(URL, params={"include_whatsapp": "false"}))
+    assert "WhatsApp" not in headers
+    assert not any(c.hyperlink for r in ws.iter_rows() for c in r)
+    entry = db_session.scalars(
+        select(AuditLog).where(AuditLog.action == "vehicles_exported")
+    ).all()[-1]
+    assert json.loads(entry.details)["include_whatsapp"] is False
+
+
+def test_mobile_column_shows_the_number_the_link_uses(client, customer, today):
+    v = add_vehicle(client, customer.id, contact_phone="080 2345 6789")  # landline
+    set_date(client, v["id"], "insurance", today + timedelta(days=3))
+    _, [row], _ = sheet(client.get(URL))
+    assert row["Mobile"].value.endswith("3210")  # the customer's mobile
+    assert urlparse(row["WhatsApp"].hyperlink.target).path == "/919876543210"
+
+
+def test_message_follows_a_wider_due_filter(client, customer, today):
+    v = add_vehicle(client, customer.id)
+    set_date(client, v["id"], "insurance", today + timedelta(days=40))
+    set_date(client, v["id"], "tax", today + timedelta(days=50))
+    _, [row], _ = sheet(client.get(URL, params={"due_within_days": 90}))
+    text = parse_qs(urlparse(row["WhatsApp"].hyperlink.target).query)["text"][0]
+    assert "Insurance" in text and "Road tax" in text
+
+
+def test_filters_never_widen_an_employees_scope(
+    client, customer, make_customer, make_user, make_client
+):
+    desk = make_client(make_user("employee"))
+    other = make_customer(name="Not Mine")
+    theirs = add_vehicle(client, other.id, registration="GA01A0009")
+    client.patch(f"{API}/vehicles/{theirs['id']}", json={"is_active": False})
+    for params in ({"customer_id": other.id}, {"include_inactive": "true"}):
+        _, rows, _ = sheet(desk.get(URL, params=params))
+        assert rows == []
