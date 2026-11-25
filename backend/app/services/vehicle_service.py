@@ -40,7 +40,12 @@ from app.schemas.vehicle import (
     VehicleRead,
     VehicleUpdate,
 )
-from app.services import audit_service, document_service, job_service
+from app.services import (
+    audit_service,
+    document_service,
+    job_service,
+    reminder_service,
+)
 from app.services.errors import (
     BusinessRuleError,
     ConflictError,
@@ -372,6 +377,16 @@ def update_vehicle(
             ValueSource.MANUAL.value if changes["contact_phone"] else None
         )
         changed.append("contact_phone")
+    if "assigned_to" in changed:
+        db.flush()
+        reminder_service.notify_responsible(
+            db, vehicle, previous=moves["assigned_to"]["from"]
+        )
+    if "is_active" in changed:
+        # Inactive vehicles have no open reminders; reactivating brings
+        # back the ones now due.
+        db.flush()
+        reminder_service.sync_vehicle(db, vehicle)
     if changed:
         vehicle.updated_at = _now(db)
         # Field names only (plus who/which customer it moved between): no
@@ -427,6 +442,8 @@ def set_expiry(
         ),
     )
     vehicle.updated_at = _now(db)
+    # Reminders follow the new date at once (no waiting for the daily check).
+    reminder_service.sync_vehicle(db, vehicle, expiry_type.value)
     _audit(
         db,
         "vehicle_expiry_set",

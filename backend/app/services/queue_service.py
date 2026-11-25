@@ -22,7 +22,7 @@ from app.schemas.queue import (
     ReviewQueueResponse,
     WorkQueueSummary,
 )
-from app.services import job_service
+from app.services import job_service, reminder_service
 from app.services.errors import NotFoundError
 from app.workers.ocr_handler import LOW_CONFIDENCE
 
@@ -38,6 +38,7 @@ def work_queue(db: Session, viewer: User) -> WorkQueueSummary:
     def jobs(**filters) -> int:
         return job_repository.count_jobs(db, visible_to=employee_id, **filters)
 
+    reminders_open, unread = reminder_service.counts_for(db, viewer)
     return WorkQueueSummary(
         as_of=today,
         documents_to_review=queue_repository.count(db, employee_id=employee_id),
@@ -50,6 +51,8 @@ def work_queue(db: Session, viewer: User) -> WorkQueueSummary:
         vehicle_readings_to_check=queue_repository.vehicle_readings_to_check(
             db, employee_id=employee_id
         ),
+        reminders_to_send=reminders_open,
+        unread_notifications=unread,
         jobs_with_balance_due=jobs(payment="due"),
         unassigned_jobs=jobs(unassigned=True) if employee_id is None else None,
         jobs_overpaid=jobs(payment="overpaid") if employee_id is None else None,

@@ -10,6 +10,7 @@ from app.api.v1.routes import (
     payments,
     queues,
     receipts,
+    reminders,
     reports,
     tasks,
     users,
@@ -32,3 +33,4 @@ api_router.include_router(receipts.router)
 api_router.include_router(reports.router)
 api_router.include_router(vehicles.router)
 api_router.include_router(vehicle_intake.router)
+api_router.include_router(reminders.router)

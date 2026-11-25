@@ -29,6 +29,11 @@ class WorkQueueSummary(BaseModel):
     # ones the viewer uploaded or whose vehicle they are responsible for;
     # all of them for admins.
     vehicle_readings_to_check: int
+    # Open vehicle expiry reminders the viewer can act on, ready to send or
+    # still waiting for a WhatsApp number (GET /reminders?status=open).
+    reminders_to_send: int
+    # The viewer's unread notifications (GET /notifications?unread=true).
+    unread_notifications: int
     # GET /jobs?payment=due: jobs (completed ones too) with money to collect.
     jobs_with_balance_due: int
     # Admins only (GET /jobs?unassigned=true); null for employees.

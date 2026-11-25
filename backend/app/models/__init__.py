@@ -13,6 +13,7 @@ from app.models.job_status_history import JobStatusHistory
 from app.models.ocr import OcrResult
 from app.models.payment import PAYMENT_METHODS, Payment
 from app.models.receipt import Receipt
+from app.models.reminder import DailyRun, Notification, VehicleReminder
 from app.models.sequence_counter import SequenceCounter
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
@@ -36,6 +37,7 @@ __all__ = [
     "AuditLog",
     "BackgroundTask",
     "Customer",
+    "DailyRun",
     "Document",
     "DocumentType",
     "DocumentVersion",
@@ -45,6 +47,7 @@ __all__ = [
     "JobDocument",
     "JobFee",
     "JobStatusHistory",
+    "Notification",
     "OcrResult",
     "Payment",
     "Receipt",
@@ -58,4 +61,5 @@ __all__ = [
     "Vehicle",
     "VehicleExpiry",
     "VehicleIntake",
+    "VehicleReminder",
 ]
