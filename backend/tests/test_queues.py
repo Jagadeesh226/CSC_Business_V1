@@ -418,6 +418,8 @@ def test_work_queue_summary_for_admin(client, db_session, make_job, employee_use
         "jobs_overdue": 1,
         "jobs_due_today": 1,
         "vehicle_readings_to_check": 0,
+        "reminders_to_send": 0,  # no vehicles in this story
+        "unread_notifications": 0,
         "jobs_with_balance_due": 0,  # this service has no fees
         "unassigned_jobs": 3,
         "jobs_overpaid": 0,
