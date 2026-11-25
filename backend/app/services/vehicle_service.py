@@ -93,7 +93,7 @@ def get_visible(db: Session, vehicle_id: int, viewer: User) -> Vehicle:
     return _visible(db, repo.get(db, vehicle_id), viewer)
 
 
-def _can_reveal(vehicle: Vehicle, viewer: User) -> bool:
+def can_reveal(vehicle: Vehicle, viewer: User) -> bool:
     return job_service.is_admin(viewer) or vehicle.assigned_to == viewer.id
 
 
@@ -178,7 +178,7 @@ def get_vehicle(
 ) -> VehicleRead:
     vehicle = get_visible(db, vehicle_id, viewer)
     if reveal:
-        if not _can_reveal(vehicle, viewer):
+        if not can_reveal(vehicle, viewer):
             _audit(db, "vehicle_identifiers_reveal_denied", vehicle, viewer)
             db.commit()
             raise PermissionDeniedError(
@@ -227,7 +227,7 @@ def list_vehicles(
 # ---------- writing ----------
 
 
-def _set_identifier(vehicle: Vehicle, part: str, value: str | None) -> None:
+def set_identifier(vehicle: Vehicle, part: str, value: str | None) -> None:
     if value is None:
         setattr(vehicle, f"{part}_sealed", None)
         setattr(vehicle, f"{part}_last4", None)
@@ -238,7 +238,7 @@ def _set_identifier(vehicle: Vehicle, part: str, value: str | None) -> None:
         setattr(vehicle, f"{part}_last4", value[-4:])
 
 
-def _identifier_value(vehicle: Vehicle, part: str) -> str | None:
+def identifier_value(vehicle: Vehicle, part: str) -> str | None:
     return _identifier(vehicle, part, reveal=True)
 
 
@@ -287,8 +287,8 @@ def create_vehicle(db: Session, data: VehicleCreate, actor: User) -> VehicleRead
         if _constraint(exc) == "uq_vehicles_registration_key":
             raise ConflictError(DUPLICATE) from None
         raise
-    _set_identifier(vehicle, "chassis", data.chassis_number)
-    _set_identifier(vehicle, "engine", data.engine_number)
+    set_identifier(vehicle, "chassis", data.chassis_number)
+    set_identifier(vehicle, "engine", data.engine_number)
     _audit(
         db,
         "vehicle_created",
@@ -313,7 +313,7 @@ def update_vehicle(
         raise PermissionDeniedError(f"Only an admin can change: {', '.join(blocked)}.")
     # Changing a number you may not see would let you wipe it, or test
     # guesses against it; only those who may see it can change it.
-    if not _can_reveal(vehicle, actor) and (
+    if not can_reveal(vehicle, actor) and (
         "chassis_number" in changes or "engine_number" in changes
     ):
         raise PermissionDeniedError(
@@ -363,8 +363,8 @@ def update_vehicle(
                 changed.append(field)
     for part in ("chassis", "engine"):
         field = f"{part}_number"
-        if field in changes and changes[field] != _identifier_value(vehicle, part):
-            _set_identifier(vehicle, part, changes[field])
+        if field in changes and changes[field] != identifier_value(vehicle, part):
+            set_identifier(vehicle, part, changes[field])
             changed.append(field)
     if "contact_phone" in changes and changes["contact_phone"] != vehicle.contact_phone:
         vehicle.contact_phone = changes["contact_phone"]

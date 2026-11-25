@@ -26,6 +26,7 @@ from app.models.vehicle import (
     Vehicle,
     VehicleExpiry,
 )
+from app.models.vehicle_intake import VehicleIntake
 
 __all__ = [
     "EXPIRY_TYPES",
@@ -56,4 +57,5 @@ __all__ = [
     "UserSession",
     "Vehicle",
     "VehicleExpiry",
+    "VehicleIntake",
 ]

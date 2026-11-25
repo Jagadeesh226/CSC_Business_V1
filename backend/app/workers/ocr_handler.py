@@ -139,6 +139,15 @@ def run_document_ocr(db: Session, info: TaskInfo) -> dict:
     db.add(result)
     document.status = "needs_review"
 
+    doc_type = db.get(DocumentType, document.document_type_id)
+    if doc_type is not None and doc_type.vehicle_role == "registration_certificate":
+        # Phase 4.1: create or fill the customer's vehicle from this RC.
+        from app.services import vehicle_intake
+
+        vehicle_intake.process(
+            db, document, version, values, confidences, stored.uploaded_by
+        )
+
     missing = sorted(k for k, c in confidences.items() if c is None)
     low = sorted(
         k for k, c in confidences.items() if c is not None and c < LOW_CONFIDENCE

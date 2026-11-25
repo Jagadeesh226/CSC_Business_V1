@@ -166,6 +166,25 @@ OcrFields = Annotated[
 ]
 
 
+class VehicleRole(StrEnum):
+    # OCR of this document creates or fills the customer's vehicle. Fields
+    # it uses (by OCR key): registration_number (required), chassis_number,
+    # engine_number, owner_name, vehicle_class.
+    REGISTRATION_CERTIFICATE = "registration_certificate"
+
+
+RC_REQUIRED_KEY = "registration_number"
+
+
+def check_vehicle_role(role: "VehicleRole | None", fields: list) -> None:
+    keys = {f["key"] if isinstance(f, dict) else f.key for f in fields or []}
+    if role is not None and RC_REQUIRED_KEY not in keys:
+        raise ValueError(
+            "A registration certificate type needs an OCR field with key "
+            f"'{RC_REQUIRED_KEY}'."
+        )
+
+
 class DocumentTypeCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -174,17 +193,24 @@ class DocumentTypeCreate(BaseModel):
     description: Text5000 | None = None
     sensitivity: Sensitivity = Sensitivity.NORMAL
     ocr_fields: OcrFields = []
+    vehicle_role: VehicleRole | None = None
     sort_order: SortOrder = 0
+
+    @model_validator(mode="after")
+    def role_needs_registration(self) -> "DocumentTypeCreate":
+        check_vehicle_role(self.vehicle_role, self.ocr_fields)
+        return self
 
 
 class DocumentTypeUpdate(_NoNulls):
     model_config = ConfigDict(extra="forbid")
-    _nullable = ("description",)
+    _nullable = ("description", "vehicle_role")
 
     name: Name150 | None = None
     description: Text5000 | None = None
     sensitivity: Sensitivity | None = None
     ocr_fields: OcrFields | None = None
+    vehicle_role: VehicleRole | None = None
     is_active: bool | None = None
     sort_order: SortOrder | None = None
 
@@ -198,6 +224,7 @@ class DocumentTypeRead(BaseModel):
     description: str | None
     sensitivity: Sensitivity
     ocr_fields: list[OcrField]
+    vehicle_role: VehicleRole | None = None
     is_active: bool
     sort_order: int
 

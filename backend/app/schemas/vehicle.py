@@ -42,7 +42,7 @@ class ChallanStatus(StrEnum):
     PENDING = "pending"  # checked: challans pending
 
 
-def _registration(value: str) -> str:
+def clean_registration(value: str) -> str:
     key = normalize(value)
     if not 4 <= len(key) <= 15:
         raise ValueError("A registration number has 4 to 15 letters and digits.")
@@ -53,7 +53,7 @@ def _registration(value: str) -> str:
     return shown if len(shown) <= 20 else key
 
 
-def _identifier(value: str) -> str:
+def clean_identifier(value: str) -> str:
     key = normalize(value)
     # At least 6, so the masked form ("****" + last 4) never shows it whole.
     if not 6 <= len(key) <= 25:
@@ -62,10 +62,10 @@ def _identifier(value: str) -> str:
 
 
 Registration = Annotated[
-    str, StringConstraints(max_length=30), AfterValidator(_registration)
+    str, StringConstraints(max_length=30), AfterValidator(clean_registration)
 ]
 Identifier = Annotated[
-    str, StringConstraints(max_length=40), AfterValidator(_identifier)
+    str, StringConstraints(max_length=40), AfterValidator(clean_identifier)
 ]
 OwnerName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)

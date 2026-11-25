@@ -21,6 +21,10 @@ class DocumentType(Base):
             "sensitivity IN ('normal', 'sensitive')",
             name="ck_document_types_sensitivity",
         ),
+        CheckConstraint(
+            "vehicle_role IS NULL OR vehicle_role IN ('registration_certificate')",
+            name="ck_document_types_vehicle_role",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -35,6 +39,9 @@ class DocumentType(Base):
     ocr_fields: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default="[]", nullable=False
     )
+    # 'registration_certificate': once OCR reads a document of this type, the
+    # customer's vehicle is created or filled automatically (Phase 4.1).
+    vehicle_role: Mapped[str | None] = mapped_column(String(40))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

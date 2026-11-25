@@ -25,6 +25,7 @@ from app.schemas.catalogue import (
     ServiceFeeType,
     ServiceRead,
     ServiceUpdate,
+    check_vehicle_role,
 )
 from app.services import audit_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
@@ -240,7 +241,15 @@ def update_document_type(
     doc_type = repo.get(db, DocumentType, type_id)
     if doc_type is None:
         raise NotFoundError("Document type not found.")
-    changed = _apply(doc_type, data.model_dump(mode="json", exclude_unset=True))
+    changes = data.model_dump(mode="json", exclude_unset=True)
+    try:
+        check_vehicle_role(
+            changes.get("vehicle_role", doc_type.vehicle_role),
+            changes.get("ocr_fields", doc_type.ocr_fields),
+        )
+    except ValueError as exc:
+        raise BusinessRuleError(str(exc)) from None
+    changed = _apply(doc_type, changes)
     if changed:
         _audit(
             db, "document_type_updated", "document_type", doc_type.id, actor, changed

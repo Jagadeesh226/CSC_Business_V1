@@ -24,6 +24,11 @@ class WorkQueueSummary(BaseModel):
     # GET /jobs?due=overdue and ?due=today.
     jobs_overdue: int
     jobs_due_today: int
+    # Registration certificates whose reading waits for a person (fields
+    # OCR was unsure about, changes to accept, or a registration conflict):
+    # ones the viewer uploaded or whose vehicle they are responsible for;
+    # all of them for admins.
+    vehicle_readings_to_check: int
     # GET /jobs?payment=due: jobs (completed ones too) with money to collect.
     jobs_with_balance_due: int
     # Admins only (GET /jobs?unassigned=true); null for employees.
