@@ -167,7 +167,15 @@ def ocr_results(db: Session, documents: list[Document]) -> dict[int, OcrResult]:
 
 
 def vehicle_readings_to_check(db: Session, *, employee_id: int | None) -> int:
-    conditions = [VehicleIntake.status.in_(("needs_check", "conflict"))]
+    conditions = [
+        VehicleIntake.status.in_(("needs_check", "conflict")),
+        # Only the reading of the current version of a live document.
+        exists().where(
+            Document.id == VehicleIntake.document_id,
+            Document.current_version == VehicleIntake.document_version,
+            Document.archived_at.is_(None),
+        ),
+    ]
     if employee_id is not None:
         conditions.append(
             or_(

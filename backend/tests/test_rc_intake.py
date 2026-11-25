@@ -406,3 +406,229 @@ def test_reading_access_follows_the_document(
     url = f"{API}/documents/{document['id']}/vehicle-intake/resolve"
     assert stranger.post(url, json={}).status_code == 404
     assert stranger.get(f"{API}/work-queue").json()["vehicle_readings_to_check"] == 0
+
+
+# ---------- review fixes ----------
+
+
+def test_conflict_reveals_nothing_about_the_other_vehicle(
+    client, desk, customer, make_customer, rc_type, db_session
+):
+    seller = make_customer(name="Old Owner")
+    theirs = client.post(
+        f"{API}/vehicles",
+        json={
+            "customer_id": seller.id,
+            "registration_number": "GA07AB1234",
+            "category": "private_four_wheeler",
+            "owner_name": "OLD OWNER",
+        },
+    ).json()
+    document = upload_rc(desk, customer.id, rc_type, rc_scan())
+    run_worker(db_session, expect=1)
+
+    seen = intake(desk, document["id"]).json()
+    assert (seen["status"], seen["vehicle"]) == ("conflict", None)
+    assert str(theirs["id"]) not in json.dumps(seen)
+    url = f"{API}/documents/{document['id']}/vehicle-intake/resolve"
+    refused = desk.post(url, json={})
+    assert refused.status_code == 409
+    assert str(seller.id) not in refused.text
+    assert db_session.get(Vehicle, theirs["id"]).owner_name == "OLD OWNER"
+
+
+def test_a_typed_registration_clash_saves_nothing(
+    client, desk, customer, make_customer, rc_type, db_session
+):
+    client.post(
+        f"{API}/vehicles",
+        json={
+            "customer_id": make_customer().id,
+            "registration_number": "KA01CD5678",
+            "category": "other",
+        },
+    )
+    document = upload_rc(
+        desk, customer.id, rc_type, rc_scan(registration_number=("GA07AB1234", 0.2))
+    )
+    run_worker(db_session, expect=1)
+    url = f"{API}/documents/{document['id']}/vehicle-intake/resolve"
+    typo = desk.post(url, json={"values": {"registration_number": "KA01CD5678"}})
+    assert typo.status_code == 409
+    reading = db_session.scalar(select(VehicleIntake))
+    db_session.refresh(reading)
+    assert (reading.vehicle_id, reading.status) == (None, "needs_check")
+    fixed = desk.post(url, json={"values": {"registration_number": "GA07AB1234"}})
+    assert fixed.status_code == 200, fixed.text
+
+
+def test_confident_readings_survive_a_doubtful_registration(
+    desk, customer, rc_type, db_session
+):
+    document = upload_rc(
+        desk, customer.id, rc_type, rc_scan(registration_number=("GA07AB1234", 0.3))
+    )
+    run_worker(db_session, expect=1)
+    desk.post(
+        f"{API}/documents/{document['id']}/vehicle-intake/resolve",
+        json={"values": {"registration_number": "GA 07 AB 1234"}},
+    )
+    [vehicle] = vehicles_of(db_session, customer.id)
+    shown = desk.get(f"{API}/vehicles/{vehicle.id}", params={"reveal": "true"}).json()
+    assert (shown["owner_name"], shown["chassis_number"], shown["engine_number"]) == (
+        "RAVI KUMAR",
+        CHASSIS,
+        ENGINE,
+    )
+
+
+def test_resolve_cannot_touch_settled_fields(desk, customer, rc_type, db_session):
+    desk.post(
+        f"{API}/vehicles",
+        json={
+            "customer_id": customer.id,
+            "registration_number": "GA07AB1234",
+            "category": "private_four_wheeler",
+            "owner_name": "VERIFIED NAME",
+            "engine_number": "OLDENGINE99",
+        },
+    )
+    document = upload_rc(
+        desk, customer.id, rc_type, rc_scan(engine_number=(ENGINE, 0.3))
+    )
+    run_worker(db_session, expect=1)
+    url = f"{API}/documents/{document['id']}/vehicle-intake/resolve"
+
+    # owner_name did not wait for a person: it can't be changed or cleared here.
+    for body in ({"values": {"owner_name": None}}, {"values": {"owner_name": "X"}}):
+        assert desk.post(url, json=body).status_code == 422
+    # engine waits, but the vehicle already has one: replacing it needs accept.
+    assert desk.post(url, json={"values": {"engine_number": ENGINE}}).status_code == 422
+    # A null leaves it as it is.
+    assert desk.post(url, json={"values": {"engine_number": None}}).status_code == 200
+    [vehicle] = vehicles_of(db_session, customer.id)
+    shown = desk.get(f"{API}/vehicles/{vehicle.id}", params={"reveal": "true"}).json()
+    assert (shown["owner_name"], shown["engine_number"]) == (
+        "VERIFIED NAME",
+        "OLDENGINE99",
+    )
+
+
+def test_accepted_change_is_stored_cleaned(desk, customer, rc_type, db_session):
+    created = desk.post(
+        f"{API}/vehicles",
+        json={
+            "customer_id": customer.id,
+            "registration_number": "GA07AB1234",
+            "category": "private_four_wheeler",
+            "chassis_number": "MA3FJEB1S00999999",
+        },
+    ).json()
+    document = upload_rc(
+        desk,
+        customer.id,
+        rc_type,
+        rc_scan(chassis_number=("ma3-fjeb1s 00123456", 0.97)),
+    )
+    run_worker(db_session, expect=1)
+    desk.post(
+        f"{API}/documents/{document['id']}/vehicle-intake/resolve",
+        json={"accept_changes": True},
+    )
+    shown = desk.get(
+        f"{API}/vehicles/{created['id']}", params={"reveal": "true"}
+    ).json()
+    assert shown["chassis_number"] == CHASSIS
+
+
+def test_old_versions_and_archived_documents_leave_the_queue(
+    client, desk, customer, rc_type, db_session
+):
+    document = upload_rc(
+        desk, customer.id, rc_type, rc_scan(engine_number=(ENGINE, 0.3))
+    )
+    run_worker(db_session, expect=1)
+    assert desk.get(f"{API}/work-queue").json()["vehicle_readings_to_check"] == 1
+
+    # A clearer copy replaces it: the old reading no longer counts.
+    replaced = client.post(  # new versions need review rights (admin here)
+        f"{API}/documents/{document['id']}/versions",
+        files={"file": ("rc.png", rc_scan(), "image/png")},
+        data={"change_reason": "Clearer copy"},
+    )
+    assert replaced.status_code == 201, replaced.text
+    run_worker(db_session, expect=1)
+    assert desk.get(f"{API}/work-queue").json()["vehicle_readings_to_check"] == 0
+
+    other = upload_rc(
+        desk,
+        customer.id,
+        rc_type,
+        rc_scan(registration_number=("KA01CD5678", 0.99), engine_number=(ENGINE, 0.3)),
+    )
+    run_worker(db_session, expect=1)
+    assert desk.get(f"{API}/work-queue").json()["vehicle_readings_to_check"] == 1
+    client.post(f"{API}/documents/{other['id']}/archive", json={"reason": "Duplicate"})
+    assert desk.get(f"{API}/work-queue").json()["vehicle_readings_to_check"] == 0
+    archived = desk.post(
+        f"{API}/documents/{other['id']}/vehicle-intake/resolve", json={}
+    )
+    assert archived.status_code == 422
+
+
+def test_vehicle_trouble_never_loses_the_ocr_result(
+    desk, customer, rc_type, db_session, monkeypatch
+):
+    from sqlalchemy.exc import IntegrityError
+
+    calls = {"n": 0}
+    real_apply = vehicle_intake._apply
+
+    def clashing(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:  # someone created the same vehicle a moment ago
+            raise IntegrityError("insert", {}, Exception("duplicate key"))
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(vehicle_intake, "_apply", clashing)
+    first = upload_rc(desk, customer.id, rc_type, rc_scan())
+    run_worker(db_session, expect=1)
+    assert intake(desk, first["id"]).json()["status"] == "applied"
+    assert calls["n"] == 2
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(vehicle_intake, "_apply", broken)
+    second = upload_rc(
+        desk, customer.id, rc_type, rc_scan(registration_number=("KA01CD5678", 0.99))
+    )
+    run_worker(db_session, expect=1)
+    reading = intake(desk, second["id"]).json()
+    assert (reading["status"], reading["vehicle"]) == ("needs_check", None)
+    ocr = desk.get(f"{API}/documents/{second['id']}/ocr").json()
+    assert ocr["ocr_status"] == "completed"  # the reading itself was kept
+
+
+def test_short_readings_are_fully_masked(desk, customer, rc_type, db_session):
+    document = upload_rc(
+        desk, customer.id, rc_type, rc_scan(chassis_number=("AB12C", 0.99))
+    )
+    run_worker(db_session, expect=1)
+    field = intake(desk, document["id"]).json()["check_fields"][0]
+    assert (field["key"], field["read_value"]) == ("chassis_number", "****")
+
+
+def test_taxis_are_commercial():
+    assert vehicle_intake.category_from_class("MOTOR CAB (LMV)").value == "commercial"
+    assert vehicle_intake.category_from_class("MAXI CAB").value == "commercial"
+
+
+def test_worker_actions_are_not_put_on_a_person(desk, customer, rc_type, db_session):
+    upload_rc(desk, customer.id, rc_type, rc_scan())
+    run_worker(db_session, expect=1)
+    created = db_session.scalar(
+        select(AuditLog).where(AuditLog.action == "vehicle_created")
+    )
+    assert created.user_id is None
+    assert json.loads(created.details)["source"] == "document"
