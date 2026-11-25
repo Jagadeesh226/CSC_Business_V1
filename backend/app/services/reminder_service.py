@@ -152,6 +152,15 @@ def _ensure(
         if reopened is None:
             return False
         created = reopened
+        # Needs attention again: its notification becomes unread.
+        db.execute(
+            update(Notification)
+            .where(
+                Notification.reminder_id == reopened,
+                Notification.user_id == vehicle.assigned_to,
+            )
+            .values(read_at=None)
+        )
     customer = db.get(Customer, vehicle.customer_id)
     _notify(db, created, vehicle, customer, expiry_type, valid_until, today)
     return True
@@ -191,6 +200,13 @@ def _supersede(db: Session, condition, reason: str) -> int:
         .values(status="superseded", closed_at=func.now(), close_reason=reason)
         .returning(VehicleReminder.id)
     ).all()
+    if rows:
+        # A replaced reminder no longer needs anyone's attention.
+        db.execute(
+            update(Notification)
+            .where(Notification.reminder_id.in_(rows), Notification.read_at.is_(None))
+            .values(read_at=func.now())
+        )
     return len(rows)
 
 

@@ -82,6 +82,10 @@ def customer(make_customer):
 
 @pytest.fixture
 def today(db_session):
+    # A live run against the test database may have left today's marker;
+    # each test starts without one (inside its own rolled-back transaction).
+    db_session.query(DailyRun).delete()
+    db_session.flush()
     return business_today(db_session)
 
 
@@ -579,3 +583,13 @@ def test_mark_read_response_is_typed():
     spec = app.openapi()["paths"]["/api/v1/notifications/read-all"]["post"]
     schema = spec["responses"]["200"]["content"]["application/json"]["schema"]
     assert schema == {"$ref": "#/components/schemas/MarkedResponse"}
+
+
+def test_replaced_reminders_settle_their_notification(desk, customer, today):
+    v = add_vehicle(desk, customer.id)
+    set_date(desk, v["id"], "insurance", today + timedelta(days=5))
+    assert desk.get(f"{API}/notifications").json()["unread"] == 1
+    set_date(desk, v["id"], "insurance", today + timedelta(days=300))  # renewed
+    assert desk.get(f"{API}/notifications").json()["unread"] == 0
+    set_date(desk, v["id"], "insurance", today + timedelta(days=5))  # a mistake
+    assert desk.get(f"{API}/notifications").json()["unread"] == 1
