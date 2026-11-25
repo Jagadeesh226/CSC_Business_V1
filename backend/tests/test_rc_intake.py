@@ -429,11 +429,21 @@ def test_conflict_reveals_nothing_about_the_other_vehicle(
 
     seen = intake(desk, document["id"]).json()
     assert (seen["status"], seen["vehicle"]) == ("conflict", None)
-    assert str(theirs["id"]) not in json.dumps(seen)
+    assert seen["pending_changes"] == []  # nothing about their vehicle's values
+    # No field anywhere carries their vehicle's or customer's id.
+    body = json.dumps(seen)
+    for value in (theirs["id"], seller.id):
+        for key in ("id", "customer_id", "vehicle_id"):
+            assert (
+                f'"{key}": {value},' not in body and f'"{key}": {value}}}' not in body
+            )
     url = f"{API}/documents/{document['id']}/vehicle-intake/resolve"
     refused = desk.post(url, json={})
     assert refused.status_code == 409
-    assert str(seller.id) not in refused.text
+    assert refused.json() == {
+        "detail": "This registration belongs to another customer's vehicle. An "
+        "admin can move the vehicle to this customer first."
+    }
     assert db_session.get(Vehicle, theirs["id"]).owner_name == "OLD OWNER"
 
 
