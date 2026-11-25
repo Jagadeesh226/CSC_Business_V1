@@ -13,6 +13,7 @@ from app.api.v1.routes import (
     reports,
     tasks,
     users,
+    vehicle_intake,
     vehicles,
 )
 
@@ -30,3 +31,4 @@ api_router.include_router(payments.router)
 api_router.include_router(receipts.router)
 api_router.include_router(reports.router)
 api_router.include_router(vehicles.router)
+api_router.include_router(vehicle_intake.router)

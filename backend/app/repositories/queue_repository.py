@@ -23,6 +23,8 @@ from app.models import (
     JobAssignment,
     JobDocument,
     OcrResult,
+    Vehicle,
+    VehicleIntake,
 )
 from app.schemas.job import FINAL_STATUSES
 
@@ -162,3 +164,24 @@ def ocr_results(db: Session, documents: list[Document]) -> dict[int, OcrResult]:
         )
     )
     return {r.document_id: r for r in rows}
+
+
+def vehicle_readings_to_check(db: Session, *, employee_id: int | None) -> int:
+    conditions = [VehicleIntake.status.in_(("needs_check", "conflict"))]
+    if employee_id is not None:
+        conditions.append(
+            or_(
+                exists().where(
+                    Document.id == VehicleIntake.document_id,
+                    Document.uploaded_by == employee_id,
+                ),
+                exists().where(
+                    Vehicle.id == VehicleIntake.vehicle_id,
+                    Vehicle.assigned_to == employee_id,
+                ),
+            )
+        )
+    return int(
+        db.scalar(select(func.count()).select_from(VehicleIntake).where(*conditions))
+        or 0
+    )
