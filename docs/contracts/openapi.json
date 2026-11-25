@@ -1502,6 +1502,16 @@
             "minimum": 0.0,
             "title": "Sort Order",
             "type": "integer"
+          },
+          "vehicle_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1553,6 +1563,16 @@
           "sort_order": {
             "title": "Sort Order",
             "type": "integer"
+          },
+          "vehicle_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1671,6 +1691,16 @@
               }
             ],
             "title": "Sort Order"
+          },
+          "vehicle_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "DocumentTypeUpdate",
@@ -2133,6 +2163,232 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IntakeCheckField": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "read_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Value"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "reason",
+          "read_value"
+        ],
+        "title": "IntakeCheckField",
+        "type": "object"
+      },
+      "IntakeField": {
+        "enum": [
+          "registration_number",
+          "owner_name",
+          "chassis_number",
+          "engine_number"
+        ],
+        "title": "IntakeField",
+        "type": "string"
+      },
+      "IntakePendingChange": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "proposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed"
+          }
+        },
+        "required": [
+          "key",
+          "current",
+          "proposed"
+        ],
+        "title": "IntakePendingChange",
+        "type": "object"
+      },
+      "IntakeRead": {
+        "properties": {
+          "check_fields": {
+            "items": {
+              "$ref": "#/components/schemas/IntakeCheckField"
+            },
+            "title": "Check Fields",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "integer"
+          },
+          "document_version": {
+            "title": "Document Version",
+            "type": "integer"
+          },
+          "pending_changes": {
+            "items": {
+              "$ref": "#/components/schemas/IntakePendingChange"
+            },
+            "title": "Pending Changes",
+            "type": "array"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolved_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/IntakeStatus"
+          },
+          "values_masked": {
+            "title": "Values Masked",
+            "type": "boolean"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IntakeVehicleRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "document_id",
+          "document_version",
+          "status",
+          "vehicle",
+          "check_fields",
+          "pending_changes",
+          "values_masked",
+          "created_at",
+          "resolved_by",
+          "resolved_at"
+        ],
+        "title": "IntakeRead",
+        "type": "object"
+      },
+      "IntakeResolve": {
+        "additionalProperties": false,
+        "description": "The person's answer: values for doubtful fields (null leaves a field\nempty), and whether readings that differ from the vehicle replace the\ncurrent values.",
+        "properties": {
+          "accept_changes": {
+            "default": false,
+            "title": "Accept Changes",
+            "type": "boolean"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/IntakeField"
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "title": "IntakeResolve",
+        "type": "object"
+      },
+      "IntakeStatus": {
+        "enum": [
+          "applied",
+          "no_changes",
+          "needs_check",
+          "conflict",
+          "resolved"
+        ],
+        "title": "IntakeStatus",
+        "type": "string"
+      },
+      "IntakeVehicleRef": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "registration_number": {
+            "title": "Registration Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "registration_number",
+          "customer_id"
+        ],
+        "title": "IntakeVehicleRef",
         "type": "object"
       },
       "JobCreate": {
@@ -5136,6 +5392,13 @@
         "title": "VehicleRead",
         "type": "object"
       },
+      "VehicleRole": {
+        "enum": [
+          "registration_certificate"
+        ],
+        "title": "VehicleRole",
+        "type": "string"
+      },
       "VehicleUpdate": {
         "additionalProperties": false,
         "description": "Partial update. Owner name, chassis, engine and contact phone can be\ncleared with null. Admins only: customer_id (ownership transfer),\nassigned_to and is_active.",
@@ -5329,6 +5592,10 @@
               }
             ],
             "title": "Unassigned Jobs"
+          },
+          "vehicle_readings_to_check": {
+            "title": "Vehicle Readings To Check",
+            "type": "integer"
           }
         },
         "required": [
@@ -5340,6 +5607,7 @@
           "jobs_ready_to_resume",
           "jobs_overdue",
           "jobs_due_today",
+          "vehicle_readings_to_check",
           "jobs_with_balance_due",
           "unassigned_jobs",
           "jobs_overpaid"
@@ -7027,6 +7295,186 @@
         "summary": "Reject",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/vehicle-intake": {
+      "get": {
+        "operationId": "get_intake_api_v1_documents__document_id__vehicle_intake_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Document Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Show full chassis and engine numbers (admin or the responsible employee; audited)",
+            "in": "query",
+            "name": "reveal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Show full chassis and engine numbers (admin or the responsible employee; audited)",
+              "title": "Reveal",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed for this user"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document or reading not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Intake",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}/vehicle-intake/resolve": {
+      "post": {
+        "operationId": "resolve_intake_api_v1_documents__document_id__vehicle_intake_resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Document Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntakeResolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed for this user"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Document or reading not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Registration owned elsewhere"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Intake",
+        "tags": [
+          "vehicles"
         ]
       }
     },
