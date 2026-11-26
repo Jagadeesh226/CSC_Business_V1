@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -67,13 +68,33 @@ class VehicleReminder(Base):
     close_reason: Mapped[str | None] = mapped_column(Text)
 
 
+NOTIFICATION_KINDS = (
+    "vehicle_expiry",
+    # Phase 5.1: work that needs this person.
+    "job_assigned",
+    "ocr_failed",
+    "lookup_captcha",
+    "task_failed",
+)
+
+
 class Notification(Base):
-    """A message for one user in the app (unread until they open it)."""
+    """A message for one user in the app (unread until they open it).
+
+    Each event notifies a person once: vehicle expiries by reminder, the
+    rest by ``event_key``. A repeating event (tasks failing in the same
+    hour) updates its one notification and counts ``occurrences``."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         UniqueConstraint("user_id", "reminder_id", name="uq_notifications_reminder"),
-        CheckConstraint("kind IN ('vehicle_expiry')", name="ck_notifications_kind"),
+        UniqueConstraint("user_id", "event_key", name="uq_notifications_event"),
+        CheckConstraint(
+            "kind IN ('vehicle_expiry', 'job_assigned', 'ocr_failed', "
+            "'lookup_captcha', 'task_failed')",
+            name="ck_notifications_kind",
+        ),
+        CheckConstraint("occurrences >= 1", name="ck_notifications_occurrences"),
         Index(
             "ix_notifications_unread",
             "user_id",
@@ -88,6 +109,26 @@ class Notification(Base):
     kind: Mapped[str] = mapped_column(String(30), nullable=False)
     reminder_id: Mapped[int | None] = mapped_column(
         ForeignKey("vehicle_reminders.id", name="fk_notifications_reminder")
+    )
+    event_key: Mapped[str | None] = mapped_column(String(200))
+    # What it is about, for a link in the app (at most one is usually set).
+    job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("jobs.id", name="fk_notifications_job"), index=True
+    )
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", name="fk_notifications_document"), index=True
+    )
+    vehicle_lookup_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "vehicle_lookups.id",
+            name="fk_notifications_vehicle_lookup",
+            ondelete="SET NULL",
+        ),
+        index=True,
+    )
+    task_type: Mapped[str | None] = mapped_column(String(50))
+    occurrences: Mapped[int] = mapped_column(
+        Integer, server_default="1", nullable=False
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)

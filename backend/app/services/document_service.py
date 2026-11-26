@@ -42,7 +42,7 @@ from app.schemas.document import (
     DocumentVersionRead,
 )
 from app.schemas.job import FINAL_STATUSES, AssigneeRef
-from app.services import audit_service, job_service, task_queue
+from app.services import audit_service, job_service, notification_service, task_queue
 from app.services.errors import (
     BusinessRuleError,
     ConflictError,
@@ -471,6 +471,7 @@ def add_version(
     document.verified_by = None
     document.verified_at = None
     document.rejection_reason = None
+    notification_service.document_handled(db, document.id)
     _audit(db, "document_version_added", document.id, actor, version=version)
     _queue_ocr(db, document, actor)
     _commit_or_discard(db, storage_key)
@@ -498,6 +499,7 @@ def apply_verify(db: Session, document: Document, jobs: list[Job], actor: User) 
     document.status = DocumentStatus.VERIFIED.value
     document.verified_by = actor.id
     document.verified_at = _now()
+    notification_service.document_handled(db, document.id)
     _audit(
         db, "document_verified", document.id, actor, version=document.current_version
     )
@@ -560,6 +562,7 @@ def apply_reject(
         return
     ensure_no_closed_job(jobs, actor, "reject")
     document.status = DocumentStatus.REJECTED.value
+    notification_service.document_handled(db, document.id)
     document.rejection_reason = reason
     document.verified_by = None
     document.verified_at = None
@@ -581,6 +584,7 @@ def archive(db: Session, document_id: int, reason: str, actor: User) -> Document
     document.archived_at = _now()
     document.archived_by = actor.id
     document.archive_reason = reason
+    notification_service.document_handled(db, document.id)
     _audit(db, "document_archived", document.id, actor, reason=reason)
     db.commit()
     return _detail(db, document)

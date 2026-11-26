@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.repositories import heartbeat_repository
 from app.repositories import task_repository as repo
+from app.services import notification_service
 from app.workers import notifier, registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
 
@@ -378,7 +379,24 @@ class Worker:
             type(exc).__name__,
         )
 
+    def _tell_admins(self, info: TaskInfo) -> None:
+        """Phase 5.1: admins hear that a task failed for good (grouped per
+        type and hour). Its own transaction: it never blocks the failure
+        being recorded or the task's own failure hook."""
+        try:
+            with self._sessions() as db:
+                db.execute(text(f"SET LOCAL lock_timeout = {LOCK_TIMEOUT_MS}"))
+                notification_service.task_failed(db, info.task_type)
+                db.commit()
+        except Exception as exc:  # noqa: BLE001 - the failure itself is saved
+            log.error(
+                "Could not notify admins about task %s (%s).",
+                info.id,
+                type(exc).__name__,
+            )
+
     def _run_failure_hook(self, info: TaskInfo, error: str) -> None:
+        self._tell_admins(info)
         spec = registry.get_spec(info.task_type)
         if spec is None or spec.on_final_failure is None:
             return
