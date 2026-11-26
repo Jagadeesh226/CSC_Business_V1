@@ -122,6 +122,65 @@
         "title": "AssignmentRead",
         "type": "object"
       },
+      "BackgroundStatus": {
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "daily_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/DailyJobStatus"
+            },
+            "title": "Daily Jobs",
+            "type": "array"
+          },
+          "healthy": {
+            "title": "Healthy",
+            "type": "boolean"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "queue": {
+            "items": {
+              "$ref": "#/components/schemas/TaskTypeCounts"
+            },
+            "title": "Queue",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerStatus"
+            },
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checked_at",
+          "healthy",
+          "problems",
+          "warnings",
+          "workers",
+          "queue",
+          "daily_jobs"
+        ],
+        "title": "BackgroundStatus",
+        "type": "object"
+      },
       "Body_add_version_api_v1_documents__document_id__versions_post": {
         "properties": {
           "change_reason": {
@@ -1059,6 +1118,55 @@
           }
         },
         "title": "CustomerUpdate",
+        "type": "object"
+      },
+      "DailyJobStatus": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_business_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Business Date"
+          },
+          "last_ran_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ran At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ran_today": {
+            "title": "Ran Today",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "last_business_date",
+          "last_ran_at",
+          "ran_today"
+        ],
+        "title": "DailyJobStatus",
         "type": "object"
       },
       "DismissRequest": {
@@ -2339,6 +2447,43 @@
         },
         "title": "HTTPValidationError",
         "type": "object"
+      },
+      "HealthCheckState": {
+        "enum": [
+          "ok",
+          "unavailable"
+        ],
+        "title": "HealthCheckState",
+        "type": "string"
+      },
+      "HealthReadiness": {
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/HealthCheckState"
+          },
+          "redis": {
+            "$ref": "#/components/schemas/HealthCheckState"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "redis"
+        ],
+        "title": "HealthReadiness",
+        "type": "object"
+      },
+      "HealthStatus": {
+        "enum": [
+          "ok",
+          "degraded",
+          "unavailable"
+        ],
+        "title": "HealthStatus",
+        "type": "string"
       },
       "IntakeCheckField": {
         "properties": {
@@ -5351,6 +5496,55 @@
         "title": "TaskType",
         "type": "string"
       },
+      "TaskTypeCounts": {
+        "properties": {
+          "due": {
+            "title": "Due",
+            "type": "integer"
+          },
+          "failed_last_day": {
+            "title": "Failed Last Day",
+            "type": "integer"
+          },
+          "oldest_due_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due Seconds"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "succeeded_last_day": {
+            "title": "Succeeded Last Day",
+            "type": "integer"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          }
+        },
+        "required": [
+          "task_type",
+          "queued",
+          "due",
+          "running",
+          "failed_last_day",
+          "succeeded_last_day",
+          "oldest_due_seconds"
+        ],
+        "title": "TaskTypeCounts",
+        "type": "object"
+      },
       "UserCreate": {
         "additionalProperties": false,
         "description": "Admin creates an account with a temporary password the user must change.",
@@ -6277,6 +6471,76 @@
           "jobs_overpaid"
         ],
         "title": "WorkQueueSummary",
+        "type": "object"
+      },
+      "WorkerState": {
+        "enum": [
+          "running",
+          "stuck",
+          "not_reporting",
+          "stopped"
+        ],
+        "title": "WorkerState",
+        "type": "string"
+      },
+      "WorkerStatus": {
+        "properties": {
+          "last_active_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Active At"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/WorkerState"
+          },
+          "stopped_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped At"
+          },
+          "tasks_done": {
+            "title": "Tasks Done",
+            "type": "integer"
+          },
+          "worker_name": {
+            "title": "Worker Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker_name",
+          "state",
+          "started_at",
+          "last_seen_at",
+          "last_active_at",
+          "stopped_at",
+          "tasks_done"
+        ],
+        "title": "WorkerStatus",
         "type": "object"
       }
     }
@@ -8358,6 +8622,35 @@
           }
         },
         "summary": "Api Health"
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "For load balancers and monitors; needs no sign-in and says only\nwhether the database and Redis answer.",
+        "operationId": "api_ready_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadiness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadiness"
+                }
+              }
+            },
+            "description": "The database is down"
+          }
+        },
+        "summary": "Api Ready"
       }
     },
     "/api/v1/jobs": {
@@ -12382,6 +12675,48 @@
           }
         },
         "summary": "List Tasks",
+        "tags": [
+          "background tasks"
+        ]
+      }
+    },
+    "/api/v1/tasks/overview": {
+      "get": {
+        "description": "Is background work healthy? Workers, queue counts by task type,\nthe daily jobs, and plain-language problems.",
+        "operationId": "background_overview_api_v1_tasks_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          }
+        },
+        "summary": "Background Overview",
         "tags": [
           "background tasks"
         ]
