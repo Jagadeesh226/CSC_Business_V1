@@ -9,6 +9,7 @@ reminder with its WhatsApp link, and the Excel export.
 import io
 import itertools
 import json
+import logging
 from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -17,12 +18,12 @@ from flow_helpers import API, Counter, ok, run_worker
 from openpyxl import load_workbook
 from sqlalchemy import select
 
-from app.models import AuditLog, VehicleReminder
+from app.models import AuditLog, Job, VehicleLookup, VehicleReminder
 from app.repositories.readiness_repository import business_today
 from app.services.integration import vehicle_lookup as provider
 
 PNG = b"\x89PNG\r\n\x1a\n"
-CHASSIS = "MA3FJEB1S00123456"
+CHASSIS = "ZZ9FAKEVIN0123456"  # not a real manufacturer code
 ENGINE = "K12MN1234567"
 _unique = itertools.count(1)
 
@@ -62,11 +63,14 @@ class PortalWithCaptcha(provider.FakeLookupProvider):
 
 @pytest.fixture(autouse=True)
 def lookup_worker(monkeypatch):
-    """The worker's lookup task, registered for this module only, with the
-    portal above."""
-    from app.workers import lookup_handler, registry
+    """The worker's lookup task with the portal above, registered for each
+    test here and removed again afterwards. The registry is saved before
+    the module is imported, because importing it registers the task."""
+    from app.workers import registry
 
     saved = (dict(registry._REGISTRY), list(registry._MAINTENANCE))
+    from app.workers import lookup_handler
+
     registry.register(
         lookup_handler.TASK_TYPE,
         lookup_handler.run_vehicle_lookup,
@@ -151,7 +155,10 @@ def text_of(link):
 # ---------- the main story ----------
 
 
-def test_rc_to_reminder_to_export(client, desk, priya, today, db_session, fake_redis):
+def test_rc_to_reminder_to_export(
+    client, desk, priya, today, db_session, fake_redis, caplog
+):
+    caplog.set_level(logging.DEBUG)
     # Morning: a customer brings their RC for an insurance renewal.
     customer = desk.new_customer("Ravi Kumar", "+91 98765 43210")["customer"]
     job = desk.open_job(customer["id"], "Insurance renewal")
@@ -214,11 +221,18 @@ def test_rc_to_reminder_to_export(client, desk, priya, today, db_session, fake_r
     response = desk.c.get(
         f"{API}/reports/vehicles.xlsx", params={"due_within_days": 30}
     )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml"
+    )
     ws = load_workbook(io.BytesIO(response.content))["Vehicles"]
     headers = [c.value for c in ws[1]]
-    [row] = [dict(zip(headers, r, strict=False)) for r in ws.iter_rows(min_row=2)]
+    [row] = [dict(zip(headers, r, strict=True)) for r in ws.iter_rows(min_row=2)]
     assert row["Registration no."].value == "GA 07 AB 1234"
     assert row["Chassis no."].value == "****3456"
+    assert row["Engine no."].value == "****4567"
+    # The full number is only inside the WhatsApp link, never in a cell.
+    assert all("9876543210" not in str(c.value) for c in row.values())
     assert row["Insurance days left"].value == 12
     assert "Insurance expires on" in text_of(row["WhatsApp"].hyperlink.target)
 
@@ -226,6 +240,9 @@ def test_rc_to_reminder_to_export(client, desk, priya, today, db_session, fake_r
     trail = json.dumps(db_session.scalars(select(AuditLog.details)).all())
     for secret in (CHASSIS, ENGINE, "9876543210", provider.FAKE_CAPTCHA_ANSWER):
         assert secret not in trail
+        assert secret not in caplog.text  # nor in the application's logs
+    used = db_session.get(VehicleLookup, lookup["id"])
+    assert used.captcha_answer_sealed is None and used.state_sealed is None
     actions = set(db_session.scalars(select(AuditLog.action)).all())
     assert {
         "vehicle_created",
@@ -305,12 +322,17 @@ def test_doubtful_rc_and_handover(
     reading = ok(desk.c.get(f"{API}/documents/{rc['id']}/vehicle-intake"))
     assert [c["key"] for c in reading["check_fields"]] == ["engine_number"]
     assert desk.queue()["vehicle_readings_to_check"] == 1
+    # The vehicle already exists with everything OCR was sure about.
+    early = vehicle_of(desk, customer["id"])
+    assert early["registration_number"] == "MH 12 XY 9999"
+    assert (early["chassis_number"], early["engine_number"]) == ("****3456", None)
     ok(
         desk.c.post(
             f"{API}/documents/{rc['id']}/vehicle-intake/resolve",
             json={"values": {"engine_number": ENGINE}},
         )
     )
+    assert desk.queue()["vehicle_readings_to_check"] == 0
     vehicle = vehicle_of(desk, customer["id"])
     full = ok(desk.c.get(f"{API}/vehicles/{vehicle['id']}", params={"reveal": "true"}))
     assert full["engine_number"] == ENGINE
@@ -352,25 +374,60 @@ def test_doubtful_rc_and_handover(
 # ---------- limits ----------
 
 
-def test_colleagues_and_strangers_see_nothing(
-    desk, make_user, make_client, rto, db_session
-):
-    customer = desk.new_customer("Kiran", "9000033333")["customer"]
+def test_who_sees_what(desk, make_user, make_client, rto, db_session):
+    # A customer with only a landline: the reminder waits, with no link.
+    customer = desk.new_customer("Kiran", "080 2345 6789")["customer"]
     job = desk.open_job(customer["id"])
     desk.upload(job, "RC", rc_scan("TN 01 AB 1001"))
     run_worker(db_session, expect=1)
     vehicle = vehicle_of(desk, customer["id"])
     lookup = ok(desk.c.post(f"{API}/vehicles/{vehicle['id']}/lookups"), 202)
     run_worker(db_session, expect=1)
+    ok(
+        desk.c.post(
+            f"{API}/vehicle-lookups/{lookup['id']}/captcha",
+            json={"answer": provider.FAKE_CAPTCHA_ANSWER},
+        ),
+        202,
+    )
+    run_worker(db_session, expect=1)
+    [reminder] = ok(desk.c.get(f"{API}/reminders"))["items"]
+    assert reminder["status"] == "pending"
+    assert reminder["whatsapp_link"] is None
 
+    # A colleague with an open job for the customer sees the vehicle masked,
+    # but may not reveal it; once that job is closed, they lose it.
+    colleague = Counter(make_client(make_user("employee")), rto)
+    their_job = colleague.open_job(customer["id"])
+    seen = ok(colleague.c.get(f"{API}/vehicles/{vehicle['id']}"))
+    assert seen["chassis_number"] == "****3456"
+    assert (
+        colleague.c.get(
+            f"{API}/vehicles/{vehicle['id']}", params={"reveal": "true"}
+        ).status_code
+        == 403
+    )
+    assert ok(colleague.c.get(f"{API}/reminders"))["total"] == 1
+    db_session.get(Job, their_job["id"]).status = "completed"
+    db_session.flush()
+    assert colleague.c.get(f"{API}/vehicles/{vehicle['id']}").status_code == 404
+
+    # A stranger sees nothing, even though a reminder exists.
     stranger = make_client(make_user("employee"))
     for url in (
         f"{API}/vehicles/{vehicle['id']}",
+        f"{API}/vehicle-lookups/{lookup['id']}",
         f"{API}/vehicle-lookups/{lookup['id']}/captcha",
     ):
-        assert stranger.get(url).status_code == 404
+        assert stranger.get(url).status_code == 404, url
     assert ok(stranger.get(f"{API}/vehicles"))["total"] == 0
     assert ok(stranger.get(f"{API}/reminders"))["total"] == 0
+    assert (
+        stranger.post(
+            f"{API}/reminders/{reminder['id']}/done", json={"note": "x"}
+        ).status_code
+        == 404
+    )
     export = stranger.get(f"{API}/reports/vehicles.xlsx")
     ws = load_workbook(io.BytesIO(export.content))["Vehicles"]
     assert ws.max_row == 1  # headers only

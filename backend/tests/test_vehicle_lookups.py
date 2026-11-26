@@ -18,9 +18,12 @@ API = "/api/v1"
 def lookup_worker():
     """Register the lookup task and its maintenance as the worker does,
     for this module only."""
-    from app.workers import lookup_handler, registry
+    from app.workers import registry
 
+    # Saved before the import: importing the module registers the task.
     saved = (dict(registry._REGISTRY), list(registry._MAINTENANCE))
+    from app.workers import lookup_handler
+
     registry.register(
         lookup_handler.TASK_TYPE,
         lookup_handler.run_vehicle_lookup,
