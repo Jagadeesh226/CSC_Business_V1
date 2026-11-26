@@ -24,7 +24,12 @@ from app.core.storage import seal, unseal
 from app.models import BackgroundTask, Vehicle, VehicleLookup
 from app.repositories import vehicle_repository
 from app.repositories.readiness_repository import business_today
-from app.services import audit_service, lookup_service, vehicle_service
+from app.services import (
+    audit_service,
+    lookup_service,
+    notification_service,
+    vehicle_service,
+)
 from app.services.integration import vehicle_lookup as provider_api
 from app.workers import registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
@@ -54,6 +59,7 @@ def _finish_failed(db: Session, lookup: VehicleLookup, reason: str) -> None:
     lookup.captcha_answer_sealed = None
     lookup.captcha_png = None
     lookup.captcha_expires_at = None
+    notification_service.lookup_over(db, lookup.id)
     audit_service.record(
         db,
         action="vehicle_lookup_failed",
@@ -134,6 +140,7 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
         lookup.state_sealed = seal(
             json.dumps(outcome.state).encode(), lookup_service.state_context(lookup.id)
         )
+        notification_service.lookup_captcha(db, lookup, vehicle.registration_number)
         return {"lookup_id": lookup.id, "round": round_, "waiting": "captcha"}
 
     applied, not_applied = [], []
@@ -162,6 +169,7 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
             vehicle.challan_checked_at = vehicle_service._now(db)
     lookup.status = "completed"
     lookup.finished_at = vehicle_service._now(db)
+    notification_service.lookup_over(db, lookup.id)
     lookup.state_sealed = None
     lookup.result = {
         "expiries": {k: v.isoformat() for k, v in sorted(outcome.expiries.items())},

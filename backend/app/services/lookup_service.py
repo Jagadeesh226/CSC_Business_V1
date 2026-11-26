@@ -24,7 +24,12 @@ from app.schemas.vehicle_lookup import (
     VehicleLookupResult,
     VehicleLookupStatus,
 )
-from app.services import audit_service, task_queue, vehicle_service
+from app.services import (
+    audit_service,
+    notification_service,
+    task_queue,
+    vehicle_service,
+)
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.services.integration import vehicle_lookup as provider
 
@@ -169,6 +174,7 @@ def expire(db: Session, lookup: VehicleLookup) -> None:
     lookup.captcha_png = None
     lookup.state_sealed = None
     lookup.failure_reason = "The CAPTCHA was not answered in time."
+    notification_service.lookup_over(db, lookup.id)
     audit_service.record(
         db,
         action="vehicle_lookup_expired",
@@ -207,6 +213,7 @@ def answer_captcha(
     lookup.captcha_expires_at = None
     lookup.round += 1
     lookup.status = VehicleLookupStatus.QUEUED.value
+    notification_service.lookup_over(db, lookup.id)  # answered: not waiting
     _queue(db, lookup, actor)
     # The answer itself is never logged.
     audit_service.record(

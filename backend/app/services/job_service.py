@@ -35,7 +35,12 @@ from app.schemas.job import (
     StatusHistoryRead,
 )
 from app.schemas.user import UserRole
-from app.services import audit_service, document_service, fee_service
+from app.services import (
+    audit_service,
+    document_service,
+    fee_service,
+    notification_service,
+)
 from app.services.errors import (
     BusinessRuleError,
     ConflictError,
@@ -335,6 +340,9 @@ def _assign(
         user_id=actor.id,
         details=details,
     )
+    notification_service.job_assigned(
+        db, db.get(Job, job_id), assignment.id, user.id, actor.id
+    )
     return assignment
 
 
@@ -378,6 +386,7 @@ def unassign_user(db: Session, job_id: int, user_id: int, actor: User) -> JobRea
         raise BusinessRuleError(f"Cannot remove people from a {job.status} job.")
     if not repo.end_assignment(db, job_id, user_id, actor.id, datetime.now(UTC)):
         raise NotFoundError("This user is not assigned to the job.")
+    notification_service.job_unassigned(db, job_id, user_id)
     audit_service.record(
         db,
         action="job_unassigned",
@@ -441,6 +450,8 @@ def _record_status_change(
 ) -> None:
     old_status = job.status
     job.status = new_status
+    if new_status in FINAL_STATUSES:
+        notification_service.job_closed(db, job.id)
     repo.add_status_history(
         db,
         JobStatusHistory(

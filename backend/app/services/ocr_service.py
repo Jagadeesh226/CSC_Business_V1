@@ -34,7 +34,12 @@ from app.schemas.ocr import (
     OcrStatus,
     ReviewDecision,
 )
-from app.services import audit_service, document_service, task_queue
+from app.services import (
+    audit_service,
+    document_service,
+    notification_service,
+    task_queue,
+)
 from app.services.errors import BusinessRuleError, ConflictError, PermissionDeniedError
 from app.workers import ocr_handler, registry
 
@@ -317,6 +322,8 @@ def retry(db: Session, document_id: int, actor: User) -> OcrRead:
         raise BusinessRuleError(f"A {document.status} document cannot be processed.")
 
     task = _task(db, document, lock=True)
+    # Being read again: the failed reading needs nobody for now.
+    notification_service.document_handled(db, document.id)
     now = db.scalar(select(func.clock_timestamp()))
     if task is None:
         # Never read: start OCR now.

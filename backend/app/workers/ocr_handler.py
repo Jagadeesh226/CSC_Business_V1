@@ -21,9 +21,9 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.storage import get_storage, seal
-from app.models import Document, DocumentType, OcrResult
+from app.models import BackgroundTask, Document, DocumentType, OcrResult
 from app.repositories import document_repository
-from app.services import audit_service
+from app.services import audit_service, notification_service
 from app.services.integration import ocr as ocr_provider
 from app.workers import registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
@@ -201,6 +201,16 @@ def send_to_manual_review(
         entity_type="document",
         entity_id=document_id,
         details={"version": version, "reason": reason[:200]},
+    )
+    stored = document_repository.get_version(db, document_id, version)
+    task = db.get(BackgroundTask, task_id)
+    notification_service.ocr_failed(
+        db,
+        document,
+        version,
+        stored.uploaded_by if stored else None,
+        # A retry that fails again is a new failure to announce.
+        attempt=f":t{task_id}:a{task.attempts if task else 0}",
     )
     return True
 
