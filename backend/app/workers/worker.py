@@ -288,7 +288,9 @@ class Worker:
         spec = registry.get_spec(info.task_type)
         if spec is None:
             self._record_failure(
-                info, PermanentTaskError("No handler for this task type.")
+                info,
+                PermanentTaskError("No handler for this task type."),
+                alert_admins=True,  # a deployment problem, not the task's data
             )
             return True
         thread = threading.Thread(
@@ -344,7 +346,15 @@ class Worker:
                     type(record_exc).__name__,
                 )
 
-    def _record_failure(self, info: TaskInfo, exc: BaseException) -> None:
+    def _record_failure(
+        self, info: TaskInfo, exc: BaseException, alert_admins: bool | None = None
+    ) -> None:
+        """``alert_admins``: by default only system failures (retries used
+        up, timeouts, unexpected errors); a PermanentTaskError is an
+        expected outcome (an unreadable scan, an unknown vehicle) that its
+        failure hook reports to the person concerned."""
+        if alert_admins is None:
+            alert_admins = not isinstance(exc, PermanentTaskError)
         with self._sessions() as db:
             task = repo.lock_owned(db, info.id, self.worker_id, info.attempt)
             if task is None:
@@ -370,7 +380,7 @@ class Worker:
             # After the failure is saved, in its own transaction: it may wait
             # for locks the timed-out handler still holds without blocking
             # the task row.
-            self._run_failure_hook(info, error)
+            self._run_failure_hook(info, error, alert_admins=alert_admins)
         log.warning(
             "Task %s (%s) attempt %s failed: %s",
             info.id,
@@ -395,8 +405,11 @@ class Worker:
                 type(exc).__name__,
             )
 
-    def _run_failure_hook(self, info: TaskInfo, error: str) -> None:
-        self._tell_admins(info)
+    def _run_failure_hook(
+        self, info: TaskInfo, error: str, *, alert_admins: bool = True
+    ) -> None:
+        if alert_admins:
+            self._tell_admins(info)
         spec = registry.get_spec(info.task_type)
         if spec is None or spec.on_final_failure is None:
             return

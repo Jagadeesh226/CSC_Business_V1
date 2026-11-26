@@ -2,10 +2,13 @@
 needs them.
 
 - ``job_assigned``: someone else assigned you to a job.
-- ``ocr_failed``: OCR could not read the document you uploaded.
+- ``ocr_failed``: OCR could not read a document: told to the uploader if
+  they can still check it, otherwise to the people on its open jobs.
 - ``lookup_captcha``: the vehicle lookup you started waits for a CAPTCHA.
-- ``task_failed`` (admins): background tasks of a type failed for good;
-  one notification per type per hour, counting them.
+- ``task_failed`` (admins): background tasks of a type failed for good for
+  a system reason (retries used up, timeouts, no handler; not expected
+  outcomes such as an unreadable scan); one notification per type per
+  hour, counting them.
 
 Each is created in the caller's transaction (never committed here), at
 most once per person and event (``event_key``). When the work no longer
@@ -16,11 +19,25 @@ Messages hold what staff already see in the app (names, job numbers,
 registration numbers), never document contents, identifiers or errors.
 """
 
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import Customer, Document, DocumentType, Job, Notification, User
+from app.models import (
+    Customer,
+    Document,
+    DocumentType,
+    Job,
+    JobAssignment,
+    JobDocument,
+    Notification,
+    User,
+)
+from app.schemas.job import FINAL_STATUSES
+
+# Everything that asks a person to do something (not vehicle expiries,
+# which follow the vehicle's responsible employee).
+WORK_KINDS = ("job_assigned", "ocr_failed", "lookup_captcha", "task_failed")
 
 TASK_LABELS = {
     "document_ocr": "document reading (OCR)",
@@ -76,19 +93,103 @@ def job_assigned(
 
 def job_unassigned(db: Session, job_id: int, user_id: int) -> None:
     settle(db, kinds=("job_assigned",), user_id=user_id, job_id=job_id)
+    _settle_ocr_nobody_can_act_on(db, _documents_of(db, job_id), user_id)
 
 
 def job_closed(db: Session, job_id: int) -> None:
+    """Call after the job's status became final."""
+    db.flush()  # the checks below must see the new status
     settle(db, kinds=("job_assigned",), job_id=job_id)
+    _settle_ocr_nobody_can_act_on(db, _documents_of(db, job_id))
+
+
+def user_deactivated(db: Session, user_id: int) -> None:
+    """They cannot act on anything now; vehicle expiries move with the
+    vehicle's responsible employee instead."""
+    settle(db, kinds=WORK_KINDS, user_id=user_id)
 
 
 # ---------- documents ----------
 
 
-def ocr_failed(db: Session, document: Document, version: int, uploaded_by: int | None):
-    """The person who uploaded this version is asked to check it by hand."""
-    user = _active(db, uploaded_by)
-    if user is None:
+def _documents_of(db: Session, job_id: int) -> list[int]:
+    return list(
+        db.scalars(select(JobDocument.document_id).where(JobDocument.job_id == job_id))
+    )
+
+
+def _open_job_of_document_for(user_id: int, document_id: int):
+    return exists().where(
+        JobDocument.document_id == document_id,
+        Job.id == JobDocument.job_id,
+        Job.status.not_in(FINAL_STATUSES),
+        JobAssignment.job_id == Job.id,
+        JobAssignment.user_id == user_id,
+        JobAssignment.unassigned_at.is_(None),
+    )
+
+
+def _can_act_on(db: Session, user: User, document_id: int) -> bool:
+    """Who may check a document by hand: an admin, or someone assigned to
+    an open job that uses it (the same rule as reviewing it)."""
+    if not user.is_active:
+        return False
+    if user.role == "admin":
+        return True
+    return bool(db.scalar(select(_open_job_of_document_for(user.id, document_id))))
+
+
+def _who_can_act(db: Session, document_id: int, uploaded_by: int | None) -> list[int]:
+    """The uploader, if they can still act on it; otherwise the people
+    on the document's open jobs; otherwise nobody (it waits in the review
+    queue, which admins see)."""
+    uploader = _active(db, uploaded_by)
+    if uploader is not None and _can_act_on(db, uploader, document_id):
+        return [uploader.id]
+    return list(
+        db.scalars(
+            select(User.id)
+            .where(
+                User.is_active.is_(True),
+                _open_job_of_document_for(User.id, document_id),
+            )
+            .order_by(User.id)
+        )
+    )
+
+
+def _settle_ocr_nobody_can_act_on(
+    db: Session, document_ids: list[int], user_id: int | None = None
+) -> None:
+    """Failed readings of these documents, for people who can no longer
+    act on them (job closed, taken off it)."""
+    if not document_ids:
+        return
+    conditions = [
+        Notification.kind == "ocr_failed",
+        Notification.read_at.is_(None),
+        Notification.document_id.in_(document_ids),
+    ]
+    if user_id is not None:
+        conditions.append(Notification.user_id == user_id)
+    for note in db.scalars(select(Notification).where(*conditions)).all():
+        user = db.get(User, note.user_id)
+        if not _can_act_on(db, user, note.document_id):
+            note.read_at = func.now()
+    db.flush()
+
+
+def ocr_failed(
+    db: Session,
+    document: Document,
+    version: int,
+    uploaded_by: int | None,
+    attempt: str = "",
+):
+    """Ask someone who can check the document by hand. ``attempt`` tells
+    a later failure (after a retry) apart, so it is announced again."""
+    recipients = _who_can_act(db, document.id, uploaded_by)
+    if not recipients:
         return
     doc_type = (
         db.get(DocumentType, document.document_type_id)
@@ -97,18 +198,19 @@ def ocr_failed(db: Session, document: Document, version: int, uploaded_by: int |
     )
     customer = db.get(Customer, document.customer_id)
     name = doc_type.name if doc_type else "A document"
-    _insert(
-        db,
-        user.id,
-        "ocr_failed",
-        f"ocr_failed:{document.id}:v{version}",
-        document_id=document.id,
-        title=f"Could not read: {name} for {customer.name}",
-        body=(
-            "OCR could not read this document. Check the scan and enter the "
-            "details by hand, or upload a clearer copy."
-        ),
-    )
+    for user_id in recipients:
+        _insert(
+            db,
+            user_id,
+            "ocr_failed",
+            f"ocr_failed:{document.id}:v{version}{attempt}",
+            document_id=document.id,
+            title=f"Could not read: {name} for {customer.name}",
+            body=(
+                "OCR could not read this document. Check the scan and enter "
+                "the details by hand, or upload a clearer copy."
+            ),
+        )
 
 
 def document_handled(db: Session, document_id: int) -> None:
@@ -145,19 +247,27 @@ def lookup_over(db: Session, lookup_id: int) -> None:
 # ---------- background tasks (admins) ----------
 
 
-def task_failed(db: Session, task_type: str) -> None:
-    """Every active admin: one notification per task type per hour (in
-    India), counting the failures; a new failure makes it unread again."""
-    hour = db.scalar(
+def _hour_bucket(db: Session) -> str:
+    """The current hour in India, e.g. "2026-11-26 14:00"."""
+    return db.scalar(
         select(
             func.to_char(
                 func.timezone("Asia/Kolkata", func.now()), "YYYY-MM-DD HH24:00"
             )
         )
     )
+
+
+def task_failed(db: Session, task_type: str) -> None:
+    """Every active admin: one notification per task type per hour (in
+    India), counting the failures; a new failure makes it unread again."""
+    hour = _hour_bucket(db)
     label = TASK_LABELS.get(task_type, task_type.replace("_", " "))
     admins = db.scalars(
-        select(User.id).where(User.role == "admin", User.is_active.is_(True))
+        # Same order in every transaction: concurrent failures never deadlock.
+        select(User.id)
+        .where(User.role == "admin", User.is_active.is_(True))
+        .order_by(User.id)
     ).all()
     for admin_id in admins:
         count = db.scalar(
