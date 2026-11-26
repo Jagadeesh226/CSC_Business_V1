@@ -22,7 +22,7 @@ from app.schemas.queue import (
     ReviewQueueResponse,
     WorkQueueSummary,
 )
-from app.services import job_service, reminder_service
+from app.services import job_service, lookup_service, reminder_service
 from app.services.errors import NotFoundError
 from app.workers.ocr_handler import LOW_CONFIDENCE
 
@@ -52,6 +52,7 @@ def work_queue(db: Session, viewer: User) -> WorkQueueSummary:
             db, employee_id=employee_id
         ),
         reminders_to_send=reminders_open,
+        lookups_waiting_for_captcha=lookup_service.waiting_count(db, viewer),
         unread_notifications=unread,
         jobs_with_balance_due=jobs(payment="due"),
         unassigned_jobs=jobs(unassigned=True) if employee_id is None else None,

@@ -17,6 +17,7 @@ import os
 os.environ["COOKIE_SECURE"] = "false"
 # Tests use the fake OCR provider, which reads answers embedded in test files.
 os.environ["OCR_PROVIDER"] = "fake"
+os.environ["VEHICLE_LOOKUP_PROVIDER"] = "fake"
 
 from collections.abc import Callable, Iterator
 from decimal import Decimal
