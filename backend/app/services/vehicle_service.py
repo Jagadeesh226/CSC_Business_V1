@@ -417,14 +417,40 @@ def set_expiry(
         if document.customer_id != vehicle.customer_id:
             raise BusinessRuleError("That document belongs to another customer.")
         source = ValueSource.DOCUMENT.value
-    current = repo.current_expiry(db, vehicle.id, expiry_type.value)
+    record_expiry(
+        db,
+        vehicle,
+        expiry_type.value,
+        data.valid_until,
+        source=source,
+        document_id=data.document_id,
+        actor_id=actor.id,
+    )
+    db.commit()
+    return _read(db, vehicle)
+
+
+def record_expiry(
+    db: Session,
+    vehicle: Vehicle,
+    expiry_type: str,
+    valid_until: date | None,
+    *,
+    source: str,
+    document_id: int | None = None,
+    actor_id: int | None = None,
+) -> bool:
+    """Record a validity date on a locked vehicle (caller commits): the old
+    date stays in the history, reminders follow at once, and it is audited.
+    Returns False when nothing changed."""
+    current = repo.current_expiry(db, vehicle.id, expiry_type)
     unchanged = (
         current is not None
-        and current.valid_until == data.valid_until
-        and current.source_document_id == data.document_id
+        and current.valid_until == valid_until
+        and current.source_document_id == document_id
     )
-    if unchanged or (current is None and data.valid_until is None):
-        return _read(db, vehicle)  # nothing to record
+    if unchanged or (current is None and valid_until is None):
+        return False
     if current is not None:
         current.is_current = False
         db.flush()
@@ -432,32 +458,34 @@ def set_expiry(
         db,
         VehicleExpiry(
             vehicle_id=vehicle.id,
-            expiry_type=expiry_type.value,
-            valid_until=data.valid_until,
+            expiry_type=expiry_type,
+            valid_until=valid_until,
             source=source,
-            source_document_id=data.document_id,
+            source_document_id=document_id,
             is_current=True,
-            recorded_by=actor.id,
+            recorded_by=actor_id,
             recorded_at=_now(db),
         ),
     )
     vehicle.updated_at = _now(db)
     # Reminders follow the new date at once (no waiting for the daily check).
-    reminder_service.sync_vehicle(db, vehicle, expiry_type.value)
-    _audit(
+    reminder_service.sync_vehicle(db, vehicle, expiry_type)
+    audit_service.record(
         db,
-        "vehicle_expiry_set",
-        vehicle,
-        actor,
-        expiry_type=expiry_type.value,
-        valid_until=data.valid_until.isoformat() if data.valid_until else None,
-        previous=current.valid_until.isoformat()
-        if current is not None and current.valid_until
-        else None,
-        source=source,
+        action="vehicle_expiry_set",
+        entity_type="vehicle",
+        entity_id=vehicle.id,
+        user_id=actor_id,
+        details={
+            "expiry_type": expiry_type,
+            "valid_until": valid_until.isoformat() if valid_until else None,
+            "previous": current.valid_until.isoformat()
+            if current is not None and current.valid_until
+            else None,
+            "source": source,
+        },
     )
-    db.commit()
-    return _read(db, vehicle)
+    return True
 
 
 def expiry_history(

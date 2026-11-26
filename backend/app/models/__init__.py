@@ -28,6 +28,7 @@ from app.models.vehicle import (
     VehicleExpiry,
 )
 from app.models.vehicle_intake import VehicleIntake
+from app.models.vehicle_lookup import VehicleLookup
 
 __all__ = [
     "EXPIRY_TYPES",
@@ -61,5 +62,6 @@ __all__ = [
     "Vehicle",
     "VehicleExpiry",
     "VehicleIntake",
+    "VehicleLookup",
     "VehicleReminder",
 ]

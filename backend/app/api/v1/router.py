@@ -15,6 +15,7 @@ from app.api.v1.routes import (
     tasks,
     users,
     vehicle_intake,
+    vehicle_lookups,
     vehicles,
 )
 
@@ -34,3 +35,4 @@ api_router.include_router(reports.router)
 api_router.include_router(vehicles.router)
 api_router.include_router(vehicle_intake.router)
 api_router.include_router(reminders.router)
+api_router.include_router(vehicle_lookups.router)

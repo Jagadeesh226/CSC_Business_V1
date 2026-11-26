@@ -32,6 +32,9 @@ class WorkQueueSummary(BaseModel):
     # Open vehicle expiry reminders the viewer can act on, ready to send or
     # still waiting for a WhatsApp number (GET /reminders?status=open).
     reminders_to_send: int
+    # Vehicle lookups waiting for a CAPTCHA the viewer started (all of them
+    # for admins).
+    lookups_waiting_for_captcha: int
     # The viewer's unread notifications (GET /notifications?unread=true).
     unread_notifications: int
     # GET /jobs?payment=due: jobs (completed ones too) with money to collect.
