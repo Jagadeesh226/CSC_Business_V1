@@ -214,6 +214,22 @@
         "title": "CancelRequest",
         "type": "object"
       },
+      "CaptchaAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Answer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "CaptchaAnswer",
+        "type": "object"
+      },
       "CategoryCreate": {
         "additionalProperties": false,
         "properties": {
@@ -5699,6 +5715,189 @@
         "title": "VehicleListResponse",
         "type": "object"
       },
+      "VehicleLookupList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VehicleLookupRead"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "VehicleLookupList",
+        "type": "object"
+      },
+      "VehicleLookupRead": {
+        "properties": {
+          "captcha_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captcha Expires At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleLookupResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/VehicleLookupStatus"
+          },
+          "vehicle_id": {
+            "title": "Vehicle Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "vehicle_id",
+          "status",
+          "provider",
+          "requested_by",
+          "created_at",
+          "finished_at",
+          "failure_reason",
+          "result",
+          "captcha_expires_at"
+        ],
+        "title": "VehicleLookupRead",
+        "type": "object"
+      },
+      "VehicleLookupResult": {
+        "properties": {
+          "applied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Applied",
+            "type": "array"
+          },
+          "challan_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challan Count"
+          },
+          "challan_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challan Status"
+          },
+          "expiries": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Expiries",
+            "type": "object"
+          },
+          "not_applied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Applied",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expiries",
+          "challan_status",
+          "challan_count",
+          "applied",
+          "not_applied"
+        ],
+        "title": "VehicleLookupResult",
+        "type": "object"
+      },
+      "VehicleLookupStatus": {
+        "enum": [
+          "queued",
+          "waiting_for_captcha",
+          "completed",
+          "failed",
+          "expired"
+        ],
+        "title": "VehicleLookupStatus",
+        "type": "string"
+      },
       "VehicleRead": {
         "properties": {
           "assigned_to": {
@@ -6032,6 +6231,10 @@
             "title": "Jobs With Balance Due",
             "type": "integer"
           },
+          "lookups_waiting_for_captcha": {
+            "title": "Lookups Waiting For Captcha",
+            "type": "integer"
+          },
           "reminders_to_send": {
             "title": "Reminders To Send",
             "type": "integer"
@@ -6067,6 +6270,7 @@
           "jobs_due_today",
           "vehicle_readings_to_check",
           "reminders_to_send",
+          "lookups_waiting_for_captcha",
           "unread_notifications",
           "jobs_with_balance_due",
           "unassigned_jobs",
@@ -13041,6 +13245,238 @@
         ]
       }
     },
+    "/api/v1/vehicle-lookups/{lookup_id}": {
+      "get": {
+        "operationId": "get_lookup_api_v1_vehicle_lookups__lookup_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lookup_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Lookup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleLookupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Lookup",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicle-lookups/{lookup_id}/captcha": {
+      "get": {
+        "operationId": "captcha_image_api_v1_vehicle_lookups__lookup_id__captcha_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lookup_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Lookup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The CAPTCHA to read"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Captcha Image",
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "post": {
+        "description": "The person's answer to the CAPTCHA; the lookup continues.",
+        "operationId": "answer_captcha_api_v1_vehicle_lookups__lookup_id__captcha_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lookup_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Lookup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptchaAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleLookupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Captcha",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
     "/api/v1/vehicles": {
       "get": {
         "operationId": "list_vehicles_api_v1_vehicles_get",
@@ -13635,6 +14071,163 @@
           }
         },
         "summary": "Expiry History",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/api/v1/vehicles/{vehicle_id}/lookups": {
+      "get": {
+        "operationId": "list_lookups_api_v1_vehicles__vehicle_id__lookups_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleLookupList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Lookups",
+        "tags": [
+          "vehicles"
+        ]
+      },
+      "post": {
+        "description": "Look up the vehicle's validity dates and pending challans from the\nconfigured source (in the background).",
+        "operationId": "request_lookup_api_v1_vehicles__vehicle_id__lookups_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicle_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "maximum": 2147483647,
+              "title": "Vehicle Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleLookupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "A lookup is already running"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Lookup",
         "tags": [
           "vehicles"
         ]
