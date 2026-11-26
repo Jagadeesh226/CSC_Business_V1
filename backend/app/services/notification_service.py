@@ -300,7 +300,7 @@ def task_failed(db: Session, task_type: str) -> None:
             .values(
                 title=f"{count} {label} {tasks} failed",
                 body=(
-                    f"Since {hour[-5:]}, {count} {label} {tasks} failed after all "
+                    f"Since {hour[-5:]} IST, {count} {label} {tasks} failed after all "
                     "retries. Open Background tasks to see why and run them again."
                 ),
             )

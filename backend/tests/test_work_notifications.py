@@ -347,7 +347,7 @@ def test_a_new_hour_starts_a_new_count(db_session, admin_user, monkeypatch):
         (2, "2 document reading (OCR) tasks failed"),
         (1, "1 document reading (OCR) task failed"),
     ]
-    assert rows[0].body.startswith("Since 10:00, 2 ")
+    assert rows[0].body.startswith("Since 10:00 IST, 2 ")
 
 
 def test_a_broken_admin_notice_never_blocks_the_failure(desk, db_session, monkeypatch):
