@@ -10952,6 +10952,128 @@
         ]
       }
     },
+    "/api/v1/reports/vehicles.xlsx": {
+      "get": {
+        "description": "Vehicles with their expiry dates and a WhatsApp link per row\n(chassis, engine and mobile masked). Employees get the vehicles they\nmay see. Audited.",
+        "operationId": "vehicles_export_api_v1_reports_vehicles_xlsx_get",
+        "parameters": [
+          {
+            "description": "Only vehicles with a date expiring within this many days (expired ones included)",
+            "in": "query",
+            "name": "due_within_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 366,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only vehicles with a date expiring within this many days (expired ones included)",
+              "title": "Due Within Days"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "description": "Add the WhatsApp column (its links carry the full mobile number)",
+            "in": "query",
+            "name": "include_whatsapp",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Add the WhatsApp column (its links carry the full mobile number)",
+              "title": "Include Whatsapp",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The vehicles spreadsheet"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Invalid filters, or too many rows (filter further)"
+          }
+        },
+        "summary": "Vehicles Export",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/review-queue": {
       "get": {
         "operationId": "review_queue_api_v1_review_queue_get",
