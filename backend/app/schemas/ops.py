@@ -8,22 +8,22 @@ from pydantic import BaseModel
 from app.schemas.task import TaskType
 
 
-class CheckState(StrEnum):
+class HealthCheckState(StrEnum):
     OK = "ok"
     UNAVAILABLE = "unavailable"
 
 
-class ReadinessStatus(StrEnum):
+class HealthStatus(StrEnum):
     OK = "ok"
     # Redis is down: the API works and workers poll the database, slower.
     DEGRADED = "degraded"
     UNAVAILABLE = "unavailable"
 
 
-class Readiness(BaseModel):
-    status: ReadinessStatus
-    database: CheckState
-    redis: CheckState
+class HealthReadiness(BaseModel):
+    status: HealthStatus
+    database: HealthCheckState
+    redis: HealthCheckState
 
 
 class WorkerState(StrEnum):

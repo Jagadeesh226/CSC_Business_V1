@@ -9,7 +9,7 @@ from app.api.v1.router import api_router
 from app.core.body_limit import UploadBodyLimit
 from app.core.dependencies import DbSession
 from app.core.storage import StorageNotConfigured
-from app.schemas.ops import Readiness, ReadinessStatus
+from app.schemas.ops import HealthReadiness, HealthStatus
 from app.services import ops_service
 from app.services.errors import ServiceError
 
@@ -44,14 +44,14 @@ def api_health():
 
 @app.get(
     "/api/v1/health/ready",
-    response_model=Readiness,
-    responses={503: {"model": Readiness, "description": "The database is down"}},
+    response_model=HealthReadiness,
+    responses={503: {"model": HealthReadiness, "description": "The database is down"}},
 )
-def api_ready(db: DbSession, response: Response) -> Readiness:
+def api_ready(db: DbSession, response: Response) -> HealthReadiness:
     """For load balancers and monitors; needs no sign-in and says only
     whether the database and Redis answer."""
     result = ops_service.readiness(db)
-    if result.status is ReadinessStatus.UNAVAILABLE:
+    if result.status is HealthStatus.UNAVAILABLE:
         response.status_code = 503
     return result
 

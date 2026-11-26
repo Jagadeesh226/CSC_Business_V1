@@ -1,6 +1,6 @@
 """Health checks and the admin's view of background work (Phase 5.0).
 
-Readiness says only whether the database and Redis answer, never why not:
+HealthReadiness says only whether the database and Redis answer, never why not:
 it needs no sign-in. The background status is for admins and holds counts,
 times and worker names only, never task payloads or errors.
 """
@@ -18,10 +18,10 @@ from app.repositories import heartbeat_repository
 from app.repositories.readiness_repository import BUSINESS_TIMEZONE
 from app.schemas.ops import (
     BackgroundStatus,
-    CheckState,
     DailyJobStatus,
-    Readiness,
-    ReadinessStatus,
+    HealthCheckState,
+    HealthReadiness,
+    HealthStatus,
     TaskTypeCounts,
     WorkerState,
     WorkerStatus,
@@ -44,7 +44,7 @@ DAILY_GRACE = timedelta(minutes=15)
 # A worker that vanished longer ago than this is listed, but no longer
 # raised as a problem: someone has had the chance to see it.
 NOT_REPORTING_PROBLEM_FOR = timedelta(hours=1)
-# Readiness needs no sign-in: answers are reused briefly so frequent probes
+# HealthReadiness needs no sign-in: answers are reused briefly so frequent probes
 # cost the database and Redis almost nothing.
 READINESS_CACHE_SECONDS = 2.0
 _READINESS_DB_TIMEOUT_MS = 2000
@@ -53,7 +53,7 @@ DAILY_JOBS = {reminder_service.DAILY_JOB: "Vehicle expiry check"}
 
 
 _cache_lock = threading.Lock()
-_cached: tuple[float, Readiness] | None = None
+_cached: tuple[float, HealthReadiness] | None = None
 
 
 def clear_readiness_cache() -> None:
@@ -61,7 +61,7 @@ def clear_readiness_cache() -> None:
     _cached = None
 
 
-def readiness(db: Session) -> Readiness:
+def readiness(db: Session) -> HealthReadiness:
     """One probe at a time per process; others reuse its answer for a
     couple of seconds (or wait for it), so probes cannot pile up on the
     connection pool."""
@@ -74,32 +74,32 @@ def readiness(db: Session) -> Readiness:
         return result
 
 
-def _probe(db: Session) -> Readiness:
-    database = CheckState.OK
+def _probe(db: Session) -> HealthReadiness:
+    database = HealthCheckState.OK
     try:
         db.execute(text(f"SET LOCAL statement_timeout = {_READINESS_DB_TIMEOUT_MS}"))
         db.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001 - reported, not raised
-        log.warning("Readiness: database unavailable (%s).", type(exc).__name__)
-        database = CheckState.UNAVAILABLE
+        log.warning("HealthReadiness: database unavailable (%s).", type(exc).__name__)
+        database = HealthCheckState.UNAVAILABLE
     try:
         # Give the connection back before waiting on Redis.
         db.rollback()
     except Exception as exc:  # noqa: BLE001 - the session is closed afterwards
-        log.debug("Readiness: rollback failed (%s).", type(exc).__name__)
-    redis_state = CheckState.OK
+        log.debug("HealthReadiness: rollback failed (%s).", type(exc).__name__)
+    redis_state = HealthCheckState.OK
     try:
         notifier.get_redis().ping()
     except Exception as exc:  # noqa: BLE001 - reported, not raised
-        log.warning("Readiness: Redis unavailable (%s).", type(exc).__name__)
-        redis_state = CheckState.UNAVAILABLE
-    if database is CheckState.UNAVAILABLE:
-        status = ReadinessStatus.UNAVAILABLE
-    elif redis_state is CheckState.UNAVAILABLE:
-        status = ReadinessStatus.DEGRADED
+        log.warning("HealthReadiness: Redis unavailable (%s).", type(exc).__name__)
+        redis_state = HealthCheckState.UNAVAILABLE
+    if database is HealthCheckState.UNAVAILABLE:
+        status = HealthStatus.UNAVAILABLE
+    elif redis_state is HealthCheckState.UNAVAILABLE:
+        status = HealthStatus.DEGRADED
     else:
-        status = ReadinessStatus.OK
-    return Readiness(status=status, database=database, redis=redis_state)
+        status = HealthStatus.OK
+    return HealthReadiness(status=status, database=database, redis=redis_state)
 
 
 def _worker_state(row, now) -> WorkerState:
