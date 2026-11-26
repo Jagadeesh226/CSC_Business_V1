@@ -19,10 +19,16 @@ Resilience:
   rolled back.
 - While too many timed-out handlers are still running, the worker pauses
   claiming new tasks instead of exhausting database connections.
+
+Heartbeat (Phase 5.0): a separate thread reports every
+``WORKER_HEARTBEAT_SECONDS`` (default 30) that the process is alive, when
+it last finished a task or a loop and how many tasks it has run, so an admin can see
+a stopped or stuck worker. A failed report is logged and tried again.
 """
 
 import logging
 import os
+import secrets
 import signal
 import socket
 import threading
@@ -33,6 +39,7 @@ import redis
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.repositories import heartbeat_repository
 from app.repositories import task_repository as repo
 from app.workers import notifier, registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
@@ -105,16 +112,25 @@ class Worker:
         worker_id: str | None = None,
         poll_interval: float = 5.0,
         redis_client: redis.Redis | None = None,
+        heartbeat_interval: float = 30.0,
     ) -> None:
         self._sessions = session_factory
         self._handler_sessions = sessionmaker(
             bind=session_factory.kw["bind"], autoflush=False, class_=HandlerSession
         )
-        self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
+        # A random part: containers often share a host name and pid 1.
+        self.worker_id = (
+            worker_id
+            or f"{socket.gethostname()[:60]}:{os.getpid()}:{secrets.token_hex(3)}"
+        )
         self.poll_interval = poll_interval
         self._redis = redis_client
         self._stop = _StopFlag()
         self._abandoned: list[threading.Thread] = []
+        self.heartbeat_interval = heartbeat_interval
+        self._tasks_done = 0
+        self._last_active: float | None = None  # time.monotonic()
+        self._paused = False
 
     # ---------- loop ----------
 
@@ -123,6 +139,18 @@ class Worker:
 
     def run_forever(self) -> None:
         log.info("Worker %s started.", self.worker_id)
+        self._report(heartbeat_repository.register, self.worker_id)
+        beats = threading.Thread(
+            target=self._heartbeat_loop, name="heartbeat", daemon=True
+        )
+        beats.start()
+        try:
+            self._loop()
+        finally:
+            self._report(heartbeat_repository.mark_stopped, self.worker_id)
+        log.info("Worker %s stopped.", self.worker_id)
+
+    def _loop(self) -> None:
         failures = 0
         while not self._stop.is_set():
             try:
@@ -138,7 +166,31 @@ class Worker:
                     delay,
                 )
                 self._stop.wait(delay)
-        log.info("Worker %s stopped.", self.worker_id)
+
+    # ---------- heartbeat ----------
+
+    def _report(self, action, *args, **kwargs) -> bool:
+        try:
+            with self._sessions() as db:
+                action(db, *args, **kwargs)
+                db.commit()
+            return True
+        except Exception as exc:  # noqa: BLE001 - reported again shortly
+            log.warning("Heartbeat not recorded (%s).", type(exc).__name__)
+            return False
+
+    def beat(self) -> bool:
+        last = self._last_active
+        return self._report(
+            heartbeat_repository.beat,
+            self.worker_id,
+            idle_for=None if last is None else time.monotonic() - last,
+            tasks_done=self._tasks_done,
+        )
+
+    def _heartbeat_loop(self) -> None:
+        while not self._stop.wait(self.heartbeat_interval):
+            self.beat()
 
     def tick(self) -> int:
         """Requeue expired leases, then run every due task. Returns count."""
@@ -147,11 +199,18 @@ class Worker:
         done = 0
         while not self._stop.is_set() and self._may_claim() and self.run_one():
             done += 1
+            self._tasks_done += 1
+            self._last_active = time.monotonic()
+        # While claiming is paused, the worker does no work: it is not active,
+        # and will show as stuck if it stays that way.
+        if not self._paused:
+            self._last_active = time.monotonic()
         return done
 
     def _may_claim(self) -> bool:
         self._abandoned = [t for t in self._abandoned if t.is_alive()]
-        if len(self._abandoned) >= MAX_ABANDONED_HANDLERS:
+        self._paused = len(self._abandoned) >= MAX_ABANDONED_HANDLERS
+        if self._paused:
             log.warning(
                 "%s timed-out handlers still running; not claiming new tasks.",
                 len(self._abandoned),
@@ -336,6 +395,25 @@ class Worker:
             )
 
 
+HEARTBEAT_RANGE = (5.0, 30.0)
+
+
+def _heartbeat_seconds() -> float:
+    """The overview treats 2 minutes of silence as a lost worker, so the
+    interval must stay well below that."""
+    raw = os.getenv("WORKER_HEARTBEAT_SECONDS", "30")
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1.0
+    low, high = HEARTBEAT_RANGE
+    if not low <= value <= high:
+        raise SystemExit(
+            f"WORKER_HEARTBEAT_SECONDS must be between {low:.0f} and {high:.0f}."
+        )
+    return value
+
+
 def main() -> None:
     from app.db.session import get_engine
     from app.workers import handlers  # noqa: F401 - registers task handlers
@@ -344,7 +422,11 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
     factory = sessionmaker(bind=get_engine(), autoflush=False)
-    worker = Worker(factory, poll_interval=float(os.getenv("WORKER_POLL_SECONDS", "5")))
+    worker = Worker(
+        factory,
+        poll_interval=float(os.getenv("WORKER_POLL_SECONDS", "5")),
+        heartbeat_interval=_heartbeat_seconds(),
+    )
     signal.signal(signal.SIGTERM, worker.stop)
     signal.signal(signal.SIGINT, worker.stop)
     worker.run_forever()

@@ -29,6 +29,7 @@ from app.models.vehicle import (
 )
 from app.models.vehicle_intake import VehicleIntake
 from app.models.vehicle_lookup import VehicleLookup
+from app.models.worker_heartbeat import WorkerHeartbeat
 
 __all__ = [
     "EXPIRY_TYPES",
@@ -64,4 +65,5 @@ __all__ = [
     "VehicleIntake",
     "VehicleLookup",
     "VehicleReminder",
+    "WorkerHeartbeat",
 ]

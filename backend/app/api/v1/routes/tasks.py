@@ -6,8 +6,9 @@ from app.api.v1.routes.jobs import RULE_422
 from app.core.dependencies import AUTH_RESPONSES, AdminUser, DbSession
 from app.schemas.error import ErrorResponse
 from app.schemas.job import MAX_DB_INT
+from app.schemas.ops import BackgroundStatus
 from app.schemas.task import TaskListResponse, TaskRead, TaskStatus, TaskType
-from app.services import task_service
+from app.services import ops_service, task_service
 
 # Admin only: watch background processing and re-run failed tasks.
 router = APIRouter(prefix="/tasks", tags=["background tasks"], responses=AUTH_RESPONSES)
@@ -28,6 +29,13 @@ def list_tasks(
     return task_service.list_tasks(
         db, page=page, page_size=page_size, status=status, task_type=task_type
     )
+
+
+@router.get("/overview", response_model=BackgroundStatus)
+def background_overview(admin: AdminUser, db: DbSession) -> BackgroundStatus:
+    """Is background work healthy? Workers, queue counts by task type,
+    the daily jobs, and plain-language problems."""
+    return ops_service.background_status(db)
 
 
 @router.get("/{task_id}", response_model=TaskRead, responses=NOT_FOUND)
