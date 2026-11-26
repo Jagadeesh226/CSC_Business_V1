@@ -7,12 +7,31 @@ import pytest
 from flow_helpers import run_worker
 from sqlalchemy import select
 
-import app.workers.lookup_handler  # noqa: F401 - registers the task, as the worker does
 from app.models import AuditLog, BackgroundTask, Vehicle, VehicleLookup
 from app.repositories.readiness_repository import business_today
 from app.services.integration import vehicle_lookup as provider
 
 API = "/api/v1"
+
+
+@pytest.fixture(autouse=True)
+def lookup_worker():
+    """Register the lookup task and its maintenance as the worker does,
+    for this module only."""
+    from app.workers import lookup_handler, registry
+
+    saved = (dict(registry._REGISTRY), list(registry._MAINTENANCE))
+    registry.register(
+        lookup_handler.TASK_TYPE,
+        lookup_handler.run_vehicle_lookup,
+        on_final_failure=lookup_handler.on_lookup_failed,
+    )
+    registry.register_maintenance(lookup_handler.expire_unanswered)
+    registry.register_maintenance(lookup_handler.recover_stuck_lookups)
+    yield
+    registry._REGISTRY.clear()
+    registry._REGISTRY.update(saved[0])
+    registry._MAINTENANCE[:] = saved[1]
 
 
 @pytest.fixture
@@ -262,3 +281,206 @@ def test_stale_rounds_do_nothing(desk, customer, db_session, monkeypatch):
     monkeypatch.setattr(provider.FakeLookupProvider, "start", never)
     assert lookup_handler.run_vehicle_lookup(db_session, info) == {"skipped": "stale"}
     assert db_session.get(Vehicle, v["id"]).challan_status == "unknown"
+
+
+# ---------- review fixes ----------
+
+
+def set_date(client, vehicle_id, kind, when):
+    response = client.put(
+        f"{API}/vehicles/{vehicle_id}/expiries/{kind}",
+        json={"valid_until": when.isoformat()},
+    )
+    assert response.status_code == 200, response.text
+
+
+def answering(found):
+    class Fixed(provider.FakeLookupProvider):
+        def start(self, request, today_):
+            return provider.LookupResult(provider="fake", expiries=found(today_))
+
+    return Fixed
+
+
+def test_staff_dates_are_not_replaced_by_older_ones(
+    desk, priya, customer, today, db_session, monkeypatch
+):
+    v = add_vehicle(desk, customer.id, "GA 07 AB 1234")
+    renewed = today + timedelta(days=360)
+    set_date(desk, v["id"], "insurance", renewed)  # entered by staff
+    set_date(desk, v["id"], "pucc", today + timedelta(days=2))  # an old PUCC
+    monkeypatch.setitem(
+        provider._PROVIDERS,
+        "fake",
+        answering(
+            lambda t: {
+                "insurance": t + timedelta(days=11),  # older than staff's
+                "pucc": t + timedelta(days=180),  # later: a renewal
+            }
+        ),
+    )
+    started = start(desk, v["id"])
+    run_worker(db_session, expect=1)
+
+    result = lookup(desk, started["id"])["result"]
+    assert (result["applied"], result["not_applied"]) == (["pucc"], ["insurance"])
+    body = desk.get(f"{API}/vehicles/{v['id']}").json()
+    by_type = {e["expiry_type"]: e for e in body["expiries"]}
+    assert by_type["insurance"]["valid_until"] == renewed.isoformat()
+    assert by_type["insurance"]["source"] == "manual"
+    assert by_type["pucc"]["source"] == "lookup"
+    # Applied by the lookup in the requester's name.
+    assert by_type["pucc"]["recorded_by"]["id"] == priya.id
+    # No reminder for the false "11 days left".
+    open_ = desk.get(f"{API}/reminders", params={"status": "open"}).json()
+    assert open_["total"] == 0
+
+
+def test_lookup_dates_follow_newer_lookups(
+    desk, customer, today, db_session, monkeypatch
+):
+    v = add_vehicle(desk, customer.id, "GA 07 AB 1234")
+    monkeypatch.setitem(
+        provider._PROVIDERS,
+        "fake",
+        answering(lambda t: {"tax": t + timedelta(days=100)}),
+    )
+    start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    monkeypatch.setitem(
+        provider._PROVIDERS,
+        "fake",
+        answering(lambda t: {"tax": t + timedelta(days=50)}),
+    )
+    start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    [tax] = desk.get(f"{API}/vehicles/{v['id']}").json()["expiries"]
+    assert tax["days_left"] == 50  # a lookup may correct a lookup
+
+
+def test_stuck_lookup_is_recovered(desk, customer, db_session):
+    from app.workers import lookup_handler
+
+    v = add_vehicle(desk, customer.id, "GA 07 AB 1234")
+    started = start(desk, v["id"])
+    row = db_session.scalar(select(VehicleLookup))
+    task = db_session.scalar(select(BackgroundTask))
+    # Its task ended, but the lookup never heard (e.g. the failure hook failed).
+    task.status = "failed"
+    row.created_at = row.created_at - timedelta(minutes=10)
+    db_session.flush()
+    assert lookup_handler.recover_stuck_lookups(db_session) == 1
+    stuck = lookup(desk, started["id"])
+    assert stuck["status"] == "failed"
+    assert desk.post(f"{API}/vehicles/{v['id']}/lookups").status_code == 202
+
+
+def test_running_lookups_are_left_alone(desk, customer, db_session):
+    from app.workers import lookup_handler
+
+    v = add_vehicle(desk, customer.id, "GA 07 AB 1234")
+    start(desk, v["id"])
+    row = db_session.scalar(select(VehicleLookup))
+    row.created_at = row.created_at - timedelta(minutes=10)
+    db_session.flush()
+    assert lookup_handler.recover_stuck_lookups(db_session) == 0  # task still queued
+
+
+def test_expiry_is_audited(desk, priya, customer, db_session):
+    from app.workers import lookup_handler
+
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 126")
+    start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    row = db_session.scalar(select(VehicleLookup))
+    row.captcha_expires_at = row.created_at - timedelta(minutes=1)
+    db_session.flush()
+    assert lookup_handler.expire_unanswered(db_session) == 1
+    db_session.flush()
+    entry = db_session.scalar(
+        select(AuditLog).where(AuditLog.action == "vehicle_lookup_expired")
+    )
+    assert entry.user_id == priya.id
+
+
+def test_busy_portal_after_an_answer_ends_the_lookup(
+    desk, customer, db_session, monkeypatch
+):
+    class BusyAfterAnswer(provider.FakeLookupProvider):
+        def resume(self, *args):
+            raise provider.LookupTemporaryError("busy")
+
+    monkeypatch.setitem(provider._PROVIDERS, "fake", BusyAfterAnswer)
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 127")
+    started = start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    desk.post(f"{API}/vehicle-lookups/{started['id']}/captcha", json={"answer": "ABCD"})
+    run_worker(db_session, expect=1)
+    ended = lookup(desk, started["id"])
+    assert ended["status"] == "failed"
+    assert "after the CAPTCHA" in ended["failure_reason"]
+
+
+def test_too_many_wrong_answers(desk, customer, db_session):
+    from app.workers import lookup_handler
+
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 128")
+    started = start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    url = f"{API}/vehicle-lookups/{started['id']}/captcha"
+    for _ in range(lookup_handler.MAX_ROUNDS - 1):
+        assert desk.post(url, json={"answer": "nope"}).status_code == 202
+        run_worker(db_session, expect=1)
+    ended = lookup(desk, started["id"])
+    assert (ended["status"], ended["failure_reason"]) == (
+        "failed",
+        "Too many CAPTCHA attempts; start a new lookup.",
+    )
+
+
+def test_portal_busy_three_times_fails_the_lookup(desk, customer, db_session):
+    v = add_vehicle(desk, customer.id, "GA 07 TMP 124")
+    started = start(desk, v["id"])
+    for _ in range(3):
+        run_worker(db_session, expect=1)  # run_worker makes the retry due
+    failed = lookup(desk, started["id"])
+    assert (failed["status"], failed["failure_reason"]) == (
+        "failed",
+        "The vehicle portal is busy; try again later.",
+    )
+
+
+def test_captcha_for_an_inactive_vehicle_is_refused(client, desk, customer, db_session):
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 129")
+    started = start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    client.patch(f"{API}/vehicles/{v['id']}", json={"is_active": False})
+    answered = client.post(
+        f"{API}/vehicle-lookups/{started['id']}/captcha", json={"answer": "ABCD"}
+    )
+    assert answered.status_code == 422
+
+
+def test_strangers_cannot_see_or_answer_captchas(
+    desk, customer, make_user, make_client, db_session
+):
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 130")
+    started = start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    stranger = make_client(make_user("employee"))
+    url = f"{API}/vehicle-lookups/{started['id']}/captcha"
+    assert stranger.get(url).status_code == 404
+    assert stranger.post(url, json={"answer": "ABCD"}).status_code == 404
+    assert stranger.get(f"{API}/work-queue").json()["lookups_waiting_for_captcha"] == 0
+
+
+def test_waiting_count_drops_when_access_is_lost(
+    client, desk, customer, make_user, db_session
+):
+    v = add_vehicle(desk, customer.id, "GA 07 CAP 131")
+    start(desk, v["id"])
+    run_worker(db_session, expect=1)
+    assert desk.get(f"{API}/work-queue").json()["lookups_waiting_for_captcha"] == 1
+    other = make_user("employee")
+    client.patch(f"{API}/vehicles/{v['id']}", json={"assigned_to": other.id})
+    assert desk.get(f"{API}/work-queue").json()["lookups_waiting_for_captcha"] == 0

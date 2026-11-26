@@ -17,11 +17,11 @@ No lookup data goes into the task's payload or result beyond ids and counts.
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.storage import seal, unseal
-from app.models import Vehicle, VehicleLookup
+from app.models import BackgroundTask, Vehicle, VehicleLookup
 from app.repositories import vehicle_repository
 from app.repositories.readiness_repository import business_today
 from app.services import audit_service, lookup_service, vehicle_service
@@ -30,6 +30,38 @@ from app.workers import registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
 
 TASK_TYPE = lookup_service.TASK_TYPE
+
+
+MAX_ROUNDS = 5
+
+
+def _may_apply(current, found) -> bool:
+    """AGENTS.md spirit (never silently overwrite verified data): a found
+    date is written when there is none, when the current one also came
+    from a lookup, or when it is later than the current one."""
+    if current is None or current.valid_until is None:
+        return True
+    if current.source == "lookup":
+        return True
+    return found > current.valid_until
+
+
+def _finish_failed(db: Session, lookup: VehicleLookup, reason: str) -> None:
+    lookup.status = "failed"
+    lookup.failure_reason = reason[:300]
+    lookup.finished_at = vehicle_service._now(db)
+    lookup.state_sealed = None
+    lookup.captcha_answer_sealed = None
+    lookup.captcha_png = None
+    lookup.captcha_expires_at = None
+    audit_service.record(
+        db,
+        action="vehicle_lookup_failed",
+        entity_type="vehicle",
+        entity_id=lookup.vehicle_id,
+        user_id=lookup.requested_by,
+        details={"lookup_id": lookup.id, "reason": reason[:200]},
+    )
 
 
 def _current(lookup: VehicleLookup | None, round_: int) -> bool:
@@ -73,6 +105,12 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
         else:
             outcome = provider.start(request, today)
     except provider_api.LookupTemporaryError as exc:
+        if lookup.captcha_answer_sealed:
+            # A CAPTCHA answer is usually good for one try only: resending it
+            # on a retry would not work, so this lookup ends here.
+            raise PermanentTaskError(
+                "The vehicle portal was busy after the CAPTCHA; start a new lookup."
+            ) from None
         raise TaskError(str(exc)[:300]) from None
     except provider_api.LookupFailedError as exc:
         raise PermanentTaskError(str(exc)[:300]) from None
@@ -86,6 +124,10 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
     lookup.captcha_answer_sealed = None
 
     if isinstance(outcome, provider_api.CaptchaNeeded):
+        if round_ >= MAX_ROUNDS:
+            # Many wrong answers look like guessing to a portal.
+            _finish_failed(db, lookup, "Too many CAPTCHA attempts; start a new lookup.")
+            return {"lookup_id": lookup.id, "round": round_, "failed": "captcha"}
         lookup.status = "waiting_for_captcha"
         lookup.captcha_png = outcome.image_png
         lookup.captcha_expires_at = lookup_service.captcha_deadline(db)
@@ -94,11 +136,25 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
         )
         return {"lookup_id": lookup.id, "round": round_, "waiting": "captcha"}
 
-    applied = []
+    applied, not_applied = [], []
     if vehicle.is_active:
+        current = {
+            e.expiry_type: e
+            for e in vehicle_repository.current_expiries(db, [vehicle.id])[vehicle.id]
+        }
         for kind, valid_until in sorted(outcome.expiries.items()):
-            if kind in provider_api.EXPIRY_TYPES and vehicle_service.record_expiry(
-                db, vehicle, kind, valid_until, source="lookup"
+            if kind not in provider_api.EXPIRY_TYPES:
+                continue
+            if not _may_apply(current.get(kind), valid_until):
+                not_applied.append(kind)
+                continue
+            if vehicle_service.record_expiry(
+                db,
+                vehicle,
+                kind,
+                valid_until,
+                source="lookup",
+                actor_id=lookup.requested_by,
             ):
                 applied.append(kind)
         if outcome.challan_status in ("none", "pending"):
@@ -112,16 +168,21 @@ def run_vehicle_lookup(db: Session, info: TaskInfo) -> dict:
         "challan_status": outcome.challan_status,
         "challan_count": outcome.challan_count,
         "applied": applied,
+        # Found but not written: the vehicle has a later date entered by staff
+        # or read from a document; a person decides.
+        "not_applied": not_applied,
     }
     audit_service.record(
         db,
         action="vehicle_lookup_completed",
         entity_type="vehicle",
         entity_id=vehicle.id,
+        user_id=lookup.requested_by,
         details={
             "lookup_id": lookup.id,
             "provider": outcome.provider,
             "applied": applied,
+            "not_applied": not_applied,
             "challan_status": outcome.challan_status,
         },
     )
@@ -133,18 +194,7 @@ def on_lookup_failed(db: Session, info: TaskInfo, error: str) -> None:
     lookup = _lock_lookup(db, int(info.payload["lookup_id"]))
     if not _current(lookup, int(info.payload["round"])):
         return
-    lookup.status = "failed"
-    lookup.failure_reason = error[:300]
-    lookup.finished_at = vehicle_service._now(db)
-    lookup.state_sealed = None
-    lookup.captcha_answer_sealed = None
-    audit_service.record(
-        db,
-        action="vehicle_lookup_failed",
-        entity_type="vehicle",
-        entity_id=lookup.vehicle_id,
-        details={"lookup_id": lookup.id, "reason": error[:200]},
-    )
+    _finish_failed(db, lookup, error)
 
 
 def expire_unanswered(db: Session) -> int:
@@ -163,5 +213,29 @@ def expire_unanswered(db: Session) -> int:
     return len(rows)
 
 
+def recover_stuck_lookups(db: Session) -> int:
+    """Maintenance: a lookup still 'queued' whose task for this round has
+    finished (or vanished) would block the vehicle for good; it fails."""
+    # Bound parameters: ":r" here is plain text, not a placeholder.
+    key = func.concat("vehicle_lookup:", VehicleLookup.id, ":r", VehicleLookup.round)
+    rows = db.scalars(
+        select(VehicleLookup)
+        .where(
+            VehicleLookup.status == "queued",
+            ~exists().where(
+                BackgroundTask.idempotency_key == key,
+                BackgroundTask.status.in_(("queued", "running")),
+            ),
+            VehicleLookup.created_at < func.now() - text("interval '5 minutes'"),
+        )
+        .with_for_update(skip_locked=True)
+        .limit(100)
+    ).all()
+    for lookup in rows:
+        _finish_failed(db, lookup, "The lookup stopped unexpectedly; start a new one.")
+    return len(rows)
+
+
 registry.register(TASK_TYPE, run_vehicle_lookup, on_final_failure=on_lookup_failed)
 registry.register_maintenance(expire_unanswered)
+registry.register_maintenance(recover_stuck_lookups)

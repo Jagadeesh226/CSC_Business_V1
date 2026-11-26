@@ -12,6 +12,12 @@ after the owner has confirmed the portal's terms allow it; it must keep any
 browser session it needs for a CAPTCHA itself, identified by the opaque
 ``state`` it returns, and must never bypass CAPTCHA, OTP or rate limits.
 
+A real provider must also be safe to call twice for the same round (a
+timed-out attempt may still be running when its retry starts), and must
+keep any browser session for a CAPTCHA outside this process's memory or
+in a long-lived service keyed by ``state``: the next round is a new task
+that any worker may run, up to the CAPTCHA deadline (5 minutes) later.
+
 Errors:
 - ``LookupTemporaryError``: try again later (portal busy, network).
 - ``LookupFailedError``: retrying cannot help (not found, blocked). Its

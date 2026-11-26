@@ -14,14 +14,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.storage import seal
-from app.models import User, VehicleLookup
+from app.models import User, Vehicle, VehicleLookup
+from app.repositories import vehicle_repository
 from app.repositories.document_repository import users_by_id
 from app.schemas.job import AssigneeRef
 from app.schemas.vehicle_lookup import (
-    LookupListResponse,
-    LookupRead,
-    LookupResultRead,
-    LookupStatus,
+    VehicleLookupList,
+    VehicleLookupRead,
+    VehicleLookupResult,
+    VehicleLookupStatus,
 )
 from app.services import audit_service, task_queue, vehicle_service
 from app.services.errors import BusinessRuleError, ConflictError, NotFoundError
@@ -48,18 +49,19 @@ def idempotency_key(lookup_id: int, round_: int) -> str:
     return f"vehicle_lookup:{lookup_id}:r{round_}"
 
 
-def _read(db: Session, lookup: VehicleLookup) -> LookupRead:
+def _read(db: Session, lookup: VehicleLookup) -> VehicleLookupRead:
     users = users_by_id(db, {lookup.requested_by})
     result = None
     if lookup.result is not None:
-        result = LookupResultRead(
+        result = VehicleLookupResult(
             expiries=lookup.result.get("expiries", {}),
             challan_status=lookup.result.get("challan_status"),
             challan_count=lookup.result.get("challan_count"),
             applied=lookup.result.get("applied", []),
+            not_applied=lookup.result.get("not_applied", []),
         )
-    waiting = lookup.status == LookupStatus.WAITING_FOR_CAPTCHA
-    return LookupRead(
+    waiting = lookup.status == VehicleLookupStatus.WAITING_FOR_CAPTCHA
+    return VehicleLookupRead(
         id=lookup.id,
         vehicle_id=lookup.vehicle_id,
         status=lookup.status,
@@ -85,7 +87,7 @@ def _queue(db: Session, lookup: VehicleLookup, actor: User) -> None:
     )
 
 
-def request_lookup(db: Session, vehicle_id: int, actor: User) -> LookupRead:
+def request_lookup(db: Session, vehicle_id: int, actor: User) -> VehicleLookupRead:
     vehicle_service.get_visible(db, vehicle_id, actor)
     vehicle = vehicle_service.repo.lock(db, vehicle_id)
     if not vehicle.is_active:
@@ -99,7 +101,7 @@ def request_lookup(db: Session, vehicle_id: int, actor: User) -> LookupRead:
             lookup = VehicleLookup(
                 vehicle_id=vehicle.id,
                 requested_by=actor.id,
-                status=LookupStatus.QUEUED.value,
+                status=VehicleLookupStatus.QUEUED.value,
                 round=1,
             )
             db.add(lookup)
@@ -135,11 +137,11 @@ def _visible_lookup(db: Session, lookup_id: int, viewer: User, lock: bool = Fals
     return lookup
 
 
-def get_lookup(db: Session, lookup_id: int, viewer: User) -> LookupRead:
+def get_lookup(db: Session, lookup_id: int, viewer: User) -> VehicleLookupRead:
     return _read(db, _visible_lookup(db, lookup_id, viewer))
 
 
-def list_lookups(db: Session, vehicle_id: int, viewer: User) -> LookupListResponse:
+def list_lookups(db: Session, vehicle_id: int, viewer: User) -> VehicleLookupList:
     vehicle_service.get_visible(db, vehicle_id, viewer)
     rows = db.scalars(
         select(VehicleLookup)
@@ -147,12 +149,12 @@ def list_lookups(db: Session, vehicle_id: int, viewer: User) -> LookupListRespon
         .order_by(VehicleLookup.created_at.desc(), VehicleLookup.id.desc())
         .limit(50)
     ).all()
-    return LookupListResponse(items=[_read(db, r) for r in rows])
+    return VehicleLookupList(items=[_read(db, r) for r in rows])
 
 
 def _expire_if_late(db: Session, lookup: VehicleLookup) -> bool:
     if (
-        lookup.status == LookupStatus.WAITING_FOR_CAPTCHA
+        lookup.status == VehicleLookupStatus.WAITING_FOR_CAPTCHA
         and lookup.captcha_expires_at is not None
         and lookup.captcha_expires_at <= _now(db)
     ):
@@ -162,34 +164,49 @@ def _expire_if_late(db: Session, lookup: VehicleLookup) -> bool:
 
 
 def expire(db: Session, lookup: VehicleLookup) -> None:
-    lookup.status = LookupStatus.EXPIRED.value
+    lookup.status = VehicleLookupStatus.EXPIRED.value
     lookup.finished_at = _now(db)
     lookup.captcha_png = None
     lookup.state_sealed = None
     lookup.failure_reason = "The CAPTCHA was not answered in time."
+    audit_service.record(
+        db,
+        action="vehicle_lookup_expired",
+        entity_type="vehicle",
+        entity_id=lookup.vehicle_id,
+        user_id=lookup.requested_by,
+        details={"lookup_id": lookup.id},
+    )
 
 
 def captcha_image(db: Session, lookup_id: int, viewer: User) -> bytes:
     lookup = _visible_lookup(db, lookup_id, viewer, lock=True)
     if _expire_if_late(db, lookup):
         db.commit()
-    if lookup.status != LookupStatus.WAITING_FOR_CAPTCHA or not lookup.captcha_png:
+    if (
+        lookup.status != VehicleLookupStatus.WAITING_FOR_CAPTCHA
+        or not lookup.captcha_png
+    ):
         raise NotFoundError("No CAPTCHA is waiting for this lookup.")
     return lookup.captcha_png
 
 
-def answer_captcha(db: Session, lookup_id: int, answer: str, actor: User) -> LookupRead:
+def answer_captcha(
+    db: Session, lookup_id: int, answer: str, actor: User
+) -> VehicleLookupRead:
     lookup = _visible_lookup(db, lookup_id, actor, lock=True)
     if _expire_if_late(db, lookup):
         db.commit()
         raise BusinessRuleError("The CAPTCHA expired; start a new lookup.")
-    if lookup.status != LookupStatus.WAITING_FOR_CAPTCHA:
+    if lookup.status != VehicleLookupStatus.WAITING_FOR_CAPTCHA:
         raise BusinessRuleError("This lookup is not waiting for a CAPTCHA.")
+    if not vehicle_service.repo.get(db, lookup.vehicle_id).is_active:
+        raise BusinessRuleError("The vehicle is inactive.")
     lookup.captcha_answer_sealed = seal(answer.encode(), answer_context(lookup.id))
     lookup.captcha_png = None
     lookup.captcha_expires_at = None
     lookup.round += 1
-    lookup.status = LookupStatus.QUEUED.value
+    lookup.status = VehicleLookupStatus.QUEUED.value
     _queue(db, lookup, actor)
     # The answer itself is never logged.
     audit_service.record(
@@ -214,8 +231,11 @@ def waiting_count(db: Session, viewer: User) -> int:
     stmt = (
         select(func.count())
         .select_from(VehicleLookup)
-        .where(VehicleLookup.status == LookupStatus.WAITING_FOR_CAPTCHA.value)
+        .where(VehicleLookup.status == VehicleLookupStatus.WAITING_FOR_CAPTCHA.value)
     )
     if viewer.role != "admin":
-        stmt = stmt.where(VehicleLookup.requested_by == viewer.id)
+        stmt = stmt.join(Vehicle, Vehicle.id == VehicleLookup.vehicle_id).where(
+            VehicleLookup.requested_by == viewer.id,
+            vehicle_repository.visible_to(viewer.id),
+        )
     return int(db.scalar(stmt) or 0)
