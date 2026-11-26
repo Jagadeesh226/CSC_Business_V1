@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +7,10 @@ from sqlalchemy.exc import DataError
 
 from app.api.v1.router import api_router
 from app.core.body_limit import UploadBodyLimit
+from app.core.dependencies import DbSession
 from app.core.storage import StorageNotConfigured
+from app.schemas.ops import Readiness, ReadinessStatus
+from app.services import ops_service
 from app.services.errors import ServiceError
 
 app = FastAPI(
@@ -37,6 +40,20 @@ def api_health():
         "status": "ok",
         "service": "csc-business-crm-api",
     }
+
+
+@app.get(
+    "/api/v1/health/ready",
+    response_model=Readiness,
+    responses={503: {"model": Readiness, "description": "The database is down"}},
+)
+def api_ready(db: DbSession, response: Response) -> Readiness:
+    """For load balancers and monitors; needs no sign-in and says only
+    whether the database and Redis answer."""
+    result = ops_service.readiness(db)
+    if result.status is ReadinessStatus.UNAVAILABLE:
+        response.status_code = 503
+    return result
 
 
 @app.exception_handler(ServiceError)

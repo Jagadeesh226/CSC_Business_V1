@@ -19,6 +19,11 @@ Resilience:
   rolled back.
 - While too many timed-out handlers are still running, the worker pauses
   claiming new tasks instead of exhausting database connections.
+
+Heartbeat (Phase 5.0): a separate thread reports every
+``WORKER_HEARTBEAT_SECONDS`` (default 30) that the process is alive, when
+it last finished a task or a loop and how many tasks it has run, so an admin can see
+a stopped or stuck worker. A failed report is logged and tried again.
 """
 
 import logging
@@ -33,6 +38,7 @@ import redis
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.repositories import heartbeat_repository
 from app.repositories import task_repository as repo
 from app.workers import notifier, registry
 from app.workers.registry import PermanentTaskError, TaskError, TaskInfo
@@ -105,6 +111,7 @@ class Worker:
         worker_id: str | None = None,
         poll_interval: float = 5.0,
         redis_client: redis.Redis | None = None,
+        heartbeat_interval: float = 30.0,
     ) -> None:
         self._sessions = session_factory
         self._handler_sessions = sessionmaker(
@@ -115,6 +122,9 @@ class Worker:
         self._redis = redis_client
         self._stop = _StopFlag()
         self._abandoned: list[threading.Thread] = []
+        self.heartbeat_interval = heartbeat_interval
+        self._tasks_done = 0
+        self._last_active: float | None = None  # time.monotonic()
 
     # ---------- loop ----------
 
@@ -123,6 +133,18 @@ class Worker:
 
     def run_forever(self) -> None:
         log.info("Worker %s started.", self.worker_id)
+        self._report(heartbeat_repository.register, self.worker_id)
+        beats = threading.Thread(
+            target=self._heartbeat_loop, name="heartbeat", daemon=True
+        )
+        beats.start()
+        try:
+            self._loop()
+        finally:
+            self._report(heartbeat_repository.mark_stopped, self.worker_id)
+        log.info("Worker %s stopped.", self.worker_id)
+
+    def _loop(self) -> None:
         failures = 0
         while not self._stop.is_set():
             try:
@@ -138,7 +160,31 @@ class Worker:
                     delay,
                 )
                 self._stop.wait(delay)
-        log.info("Worker %s stopped.", self.worker_id)
+
+    # ---------- heartbeat ----------
+
+    def _report(self, action, *args, **kwargs) -> bool:
+        try:
+            with self._sessions() as db:
+                action(db, *args, **kwargs)
+                db.commit()
+            return True
+        except Exception as exc:  # noqa: BLE001 - reported again shortly
+            log.warning("Heartbeat not recorded (%s).", type(exc).__name__)
+            return False
+
+    def beat(self) -> bool:
+        last = self._last_active
+        return self._report(
+            heartbeat_repository.beat,
+            self.worker_id,
+            idle_for=None if last is None else time.monotonic() - last,
+            tasks_done=self._tasks_done,
+        )
+
+    def _heartbeat_loop(self) -> None:
+        while not self._stop.wait(self.heartbeat_interval):
+            self.beat()
 
     def tick(self) -> int:
         """Requeue expired leases, then run every due task. Returns count."""
@@ -147,6 +193,9 @@ class Worker:
         done = 0
         while not self._stop.is_set() and self._may_claim() and self.run_one():
             done += 1
+            self._tasks_done += 1
+            self._last_active = time.monotonic()
+        self._last_active = time.monotonic()
         return done
 
     def _may_claim(self) -> bool:
@@ -344,7 +393,11 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
     factory = sessionmaker(bind=get_engine(), autoflush=False)
-    worker = Worker(factory, poll_interval=float(os.getenv("WORKER_POLL_SECONDS", "5")))
+    worker = Worker(
+        factory,
+        poll_interval=float(os.getenv("WORKER_POLL_SECONDS", "5")),
+        heartbeat_interval=float(os.getenv("WORKER_HEARTBEAT_SECONDS", "30")),
+    )
     signal.signal(signal.SIGTERM, worker.stop)
     signal.signal(signal.SIGINT, worker.stop)
     worker.run_forever()

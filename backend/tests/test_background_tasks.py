@@ -28,7 +28,8 @@ def factory(test_engine):
         with test_engine.begin() as conn:
             conn.execute(
                 text(
-                    "TRUNCATE background_tasks, audit_logs, user_sessions, users "
+                    "TRUNCATE background_tasks, worker_heartbeats, audit_logs, "
+                    "user_sessions, users "
                     "RESTART IDENTITY CASCADE"
                 )
             )
