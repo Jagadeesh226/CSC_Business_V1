@@ -20,7 +20,19 @@ def get_engine() -> Engine:
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is not configured.")
-    return create_engine(database_url, pool_pre_ping=True)
+    # Fail fast instead of hanging for minutes on an unreachable database,
+    # and notice a dead connection within about a minute.
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        connect_args={
+            "connect_timeout": 5,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 3,
+        },
+    )
 
 
 def get_db() -> Iterator[Session]:

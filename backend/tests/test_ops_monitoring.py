@@ -81,6 +81,13 @@ def ran_today(db_session):
 
 
 @pytest.fixture(autouse=True)
+def fresh_readiness():
+    ops_service.clear_readiness_cache()
+    yield
+    ops_service.clear_readiness_cache()
+
+
+@pytest.fixture(autouse=True)
 def no_leftover_workers(request):
     """Rows committed by other runs would look like real workers here.
     (Tests with committed sessions clean up for themselves: an open test
@@ -129,6 +136,47 @@ def test_database_down_is_503_without_details(anon_client):
     assert response.json()["status"] == "unavailable"
     assert response.json()["database"] == "unavailable"
     assert "password" not in response.text
+
+
+def test_readiness_answers_are_reused_briefly(anon_client):
+    pings = []
+
+    class Counting:
+        def ping(self):
+            pings.append(1)
+
+    notifier.set_redis_factory(lambda: Counting())
+    for _ in range(5):
+        assert anon_client.get(READY).status_code == 200
+    assert len(pings) == 1
+    ops_service.clear_readiness_cache()
+    anon_client.get(READY)
+    assert len(pings) == 2
+
+
+def test_readiness_gives_the_connection_back_before_redis():
+    """Review F1: a slow Redis must not hold a database connection."""
+    calls = []
+
+    class Session_:
+        def execute(self, statement):
+            calls.append(str(statement))
+
+        def rollback(self):
+            calls.append("rollback")
+
+    class SlowRedis:
+        def ping(self):
+            calls.append("ping")
+
+    notifier.set_redis_factory(lambda: SlowRedis())
+    ops_service.readiness(Session_())
+    assert calls == [
+        "SET LOCAL statement_timeout = 2000",
+        "SELECT 1",
+        "rollback",
+        "ping",
+    ]
 
 
 # ---------- overview: who may see it ----------
@@ -199,6 +247,25 @@ def test_worker_states(client, db_session, ran_today):
     ]
 
 
+def test_a_long_lost_worker_is_listed_but_no_longer_a_problem(
+    client, db_session, ran_today
+):
+    """Review F3: a crashed worker does not keep the overview red all day."""
+    add_worker(db_session, "w:new", seen=0.1, active=0.1)
+    add_worker(db_session, "w:crashed", seen=90, active=91)
+    body = client.get(OVERVIEW).json()
+    states = {w["worker_name"]: w["state"] for w in body["workers"]}
+    assert states["w:crashed"] == "not_reporting"
+    assert body["problems"] == []
+
+
+def test_waiting_tasks_with_no_worker_say_so_once(client, db_session, ran_today):
+    add_task(db_session, due_minutes=30)
+    assert client.get(OVERVIEW).json()["problems"] == [
+        "No worker is running; 1 task is waiting."
+    ]
+
+
 def test_a_stopped_worker_alone_means_no_worker(client, db_session, ran_today):
     add_worker(db_session, "done:1", seen=1, active=1, stopped=True)
     assert client.get(OVERVIEW).json()["problems"] == ["No worker is running."]
@@ -245,7 +312,10 @@ def test_queue_counts_by_type(client, db_session, ran_today):
         "succeeded_last_day": 0,
         "oldest_due_seconds": None,
     }
-    assert body["problems"] == ["1 task failed in the last 24 hours."]
+    # Expected failures (an unreadable scan) are a warning, not ill health.
+    assert body["problems"] == []
+    assert body["warnings"] == ["1 task failed in the last 24 hours."]
+    assert body["healthy"] is True
 
 
 def test_a_task_waiting_long_with_a_worker_running(client, db_session, ran_today):
@@ -294,6 +364,29 @@ def test_daily_check_not_run_today_is_a_problem(client, db_session, monkeypatch)
     assert (job["label"], job["ran_today"]) == ("Vehicle expiry check", False)
     assert job["last_business_date"] is not None
     assert body["problems"] == ["The vehicle expiry check has not run today."]
+
+
+def test_the_business_date_is_indian_time(client, db_session, monkeypatch):
+    """At 02:00 in India it is still yesterday in UTC: the daily check
+    belongs to the Indian date."""
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    local = datetime(2026, 11, 27, 2, 0)
+    utc_now = local.replace(tzinfo=ZoneInfo("Asia/Kolkata")).astimezone(UTC)
+    assert utc_now.date().isoformat() == "2026-11-26"
+    monkeypatch.setattr(ops_service, "_clock", lambda db: (utc_now, local))
+    add_worker(db_session, "w:1", seen=0.1, active=0.1)
+    db_session.execute(
+        text("DELETE FROM daily_runs WHERE name = :n"),
+        {"n": reminder_service.DAILY_JOB},
+    )
+    db_session.add(
+        DailyRun(name=reminder_service.DAILY_JOB, business_date=local.date())
+    )
+    db_session.flush()
+    [job] = client.get(OVERVIEW).json()["daily_jobs"]
+    assert job["ran_today"] is True
 
 
 def test_daily_check_ran_today(client, db_session, ran_today, monkeypatch):
@@ -383,6 +476,73 @@ def test_a_running_worker_reports_and_says_when_it_stops(factory, quick_task):
         thread.join(timeout=10)
     assert not thread.is_alive()
     assert heartbeat(factory, "hb-test:1").stopped_at is not None
+
+
+def test_an_idle_loop_counts_as_activity(factory):
+    """Review F10: a worker with nothing to do is not stuck."""
+    worker = Worker(factory, worker_id="hb-test:idle")
+    assert worker.tick() == 0
+    assert worker._last_active is not None
+    worker.beat()
+    assert heartbeat(factory, "hb-test:idle").last_active_at is not None
+
+
+def test_a_paused_worker_is_not_active(factory):
+    """Review F5: with too many hung handlers the worker claims nothing,
+    so it must not look busy."""
+    from app.workers.worker import MAX_ABANDONED_HANDLERS
+
+    gate = threading.Event()
+    hung = [
+        threading.Thread(target=gate.wait, daemon=True)
+        for _ in range(MAX_ABANDONED_HANDLERS)
+    ]
+    for t in hung:
+        t.start()
+    try:
+        worker = Worker(factory, worker_id="hb-test:paused")
+        worker._abandoned = list(hung)
+        worker._last_active = 123.0
+        worker.tick()
+        assert worker._last_active == 123.0
+    finally:
+        gate.set()
+
+
+def test_a_crashing_loop_still_marks_the_worker_stopped(factory):
+    worker = Worker(factory, worker_id="hb-test:crash", heartbeat_interval=5)
+
+    def crash():
+        raise KeyboardInterrupt
+
+    worker._loop = crash
+    with pytest.raises(KeyboardInterrupt):
+        worker.run_forever()
+    worker.stop()
+    assert heartbeat(factory, "hb-test:crash").stopped_at is not None
+
+
+def test_default_worker_names_are_unique():
+    """Review F8: containers often share a host name and pid 1."""
+    first, second = Worker(sessionmaker()), Worker(sessionmaker())
+    assert first.worker_id != second.worker_id
+    assert len(first.worker_id) <= 100
+
+
+@pytest.mark.parametrize("value", ["0", "4", "31", "120", "soon"])
+def test_heartbeat_interval_must_suit_the_overview(monkeypatch, value):
+    from app.workers.worker import _heartbeat_seconds
+
+    monkeypatch.setenv("WORKER_HEARTBEAT_SECONDS", value)
+    with pytest.raises(SystemExit):
+        _heartbeat_seconds()
+
+
+def test_heartbeat_interval_default(monkeypatch):
+    from app.workers.worker import _heartbeat_seconds
+
+    monkeypatch.delenv("WORKER_HEARTBEAT_SECONDS", raising=False)
+    assert _heartbeat_seconds() == 30.0
 
 
 def test_restart_under_the_same_name_starts_afresh(factory):

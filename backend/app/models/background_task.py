@@ -44,6 +44,8 @@ class BackgroundTask(Base):
         ),
         # Workers look for due queued tasks and for expired leases.
         Index("ix_background_tasks_due", "status", "run_after"),
+        # The admin overview counts what finished in the last day.
+        Index("ix_background_tasks_finished_at", "finished_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

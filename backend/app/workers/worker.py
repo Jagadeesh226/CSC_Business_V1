@@ -28,6 +28,7 @@ a stopped or stuck worker. A failed report is logged and tried again.
 
 import logging
 import os
+import secrets
 import signal
 import socket
 import threading
@@ -117,7 +118,11 @@ class Worker:
         self._handler_sessions = sessionmaker(
             bind=session_factory.kw["bind"], autoflush=False, class_=HandlerSession
         )
-        self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
+        # A random part: containers often share a host name and pid 1.
+        self.worker_id = (
+            worker_id
+            or f"{socket.gethostname()[:60]}:{os.getpid()}:{secrets.token_hex(3)}"
+        )
         self.poll_interval = poll_interval
         self._redis = redis_client
         self._stop = _StopFlag()
@@ -125,6 +130,7 @@ class Worker:
         self.heartbeat_interval = heartbeat_interval
         self._tasks_done = 0
         self._last_active: float | None = None  # time.monotonic()
+        self._paused = False
 
     # ---------- loop ----------
 
@@ -195,12 +201,16 @@ class Worker:
             done += 1
             self._tasks_done += 1
             self._last_active = time.monotonic()
-        self._last_active = time.monotonic()
+        # While claiming is paused, the worker does no work: it is not active,
+        # and will show as stuck if it stays that way.
+        if not self._paused:
+            self._last_active = time.monotonic()
         return done
 
     def _may_claim(self) -> bool:
         self._abandoned = [t for t in self._abandoned if t.is_alive()]
-        if len(self._abandoned) >= MAX_ABANDONED_HANDLERS:
+        self._paused = len(self._abandoned) >= MAX_ABANDONED_HANDLERS
+        if self._paused:
             log.warning(
                 "%s timed-out handlers still running; not claiming new tasks.",
                 len(self._abandoned),
@@ -385,6 +395,25 @@ class Worker:
             )
 
 
+HEARTBEAT_RANGE = (5.0, 30.0)
+
+
+def _heartbeat_seconds() -> float:
+    """The overview treats 2 minutes of silence as a lost worker, so the
+    interval must stay well below that."""
+    raw = os.getenv("WORKER_HEARTBEAT_SECONDS", "30")
+    try:
+        value = float(raw)
+    except ValueError:
+        value = -1.0
+    low, high = HEARTBEAT_RANGE
+    if not low <= value <= high:
+        raise SystemExit(
+            f"WORKER_HEARTBEAT_SECONDS must be between {low:.0f} and {high:.0f}."
+        )
+    return value
+
+
 def main() -> None:
     from app.db.session import get_engine
     from app.workers import handlers  # noqa: F401 - registers task handlers
@@ -396,7 +425,7 @@ def main() -> None:
     worker = Worker(
         factory,
         poll_interval=float(os.getenv("WORKER_POLL_SECONDS", "5")),
-        heartbeat_interval=float(os.getenv("WORKER_HEARTBEAT_SECONDS", "30")),
+        heartbeat_interval=_heartbeat_seconds(),
     )
     signal.signal(signal.SIGTERM, worker.stop)
     signal.signal(signal.SIGINT, worker.stop)

@@ -6,6 +6,8 @@ times and worker names only, never task payloads or errors.
 """
 
 import logging
+import threading
+import time
 from datetime import timedelta
 
 from sqlalchemy import case, func, select, text
@@ -39,17 +41,52 @@ STUCK_AFTER = timedelta(minutes=10)
 WAITING_TOO_LONG = timedelta(minutes=10)
 # The daily jobs run on a worker's first loop of the business day.
 DAILY_GRACE = timedelta(minutes=15)
+# A worker that vanished longer ago than this is listed, but no longer
+# raised as a problem: someone has had the chance to see it.
+NOT_REPORTING_PROBLEM_FOR = timedelta(hours=1)
+# Readiness needs no sign-in: answers are reused briefly so frequent probes
+# cost the database and Redis almost nothing.
+READINESS_CACHE_SECONDS = 2.0
+_READINESS_DB_TIMEOUT_MS = 2000
 
 DAILY_JOBS = {reminder_service.DAILY_JOB: "Vehicle expiry check"}
 
 
+_cache_lock = threading.Lock()
+_cached: tuple[float, Readiness] | None = None
+
+
+def clear_readiness_cache() -> None:
+    global _cached
+    _cached = None
+
+
 def readiness(db: Session) -> Readiness:
+    """One probe at a time per process; others reuse its answer for a
+    couple of seconds (or wait for it), so probes cannot pile up on the
+    connection pool."""
+    global _cached
+    with _cache_lock:
+        if _cached and time.monotonic() - _cached[0] < READINESS_CACHE_SECONDS:
+            return _cached[1]
+        result = _probe(db)
+        _cached = (time.monotonic(), result)
+        return result
+
+
+def _probe(db: Session) -> Readiness:
     database = CheckState.OK
     try:
+        db.execute(text(f"SET LOCAL statement_timeout = {_READINESS_DB_TIMEOUT_MS}"))
         db.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001 - reported, not raised
         log.warning("Readiness: database unavailable (%s).", type(exc).__name__)
         database = CheckState.UNAVAILABLE
+    try:
+        # Give the connection back before waiting on Redis.
+        db.rollback()
+    except Exception as exc:  # noqa: BLE001 - the session is closed afterwards
+        log.debug("Readiness: rollback failed (%s).", type(exc).__name__)
     redis_state = CheckState.OK
     try:
         notifier.get_redis().ping()
@@ -176,10 +213,15 @@ def _plural(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
 
 
-def background_status(db: Session) -> BackgroundStatus:
-    now, local_now = db.execute(
+def _clock(db: Session):
+    """The database's time, and the same moment in the business time zone."""
+    return db.execute(
         select(func.now(), func.timezone(BUSINESS_TIMEZONE, func.now()))
     ).one()
+
+
+def background_status(db: Session) -> BackgroundStatus:
+    now, local_now = _clock(db)
     today = local_now.date()
     workers = [
         WorkerStatus(
@@ -208,7 +250,10 @@ def background_status(db: Session) -> BackgroundStatus:
                 f"Worker {w.worker_name} is reporting but has not finished any "
                 "work for over 10 minutes."
             )
-        elif w.state is WorkerState.NOT_REPORTING:
+        elif (
+            w.state is WorkerState.NOT_REPORTING
+            and now - w.last_seen_at <= NOT_REPORTING_PROBLEM_FOR
+        ):
             problems.append(
                 f"Worker {w.worker_name} stopped reporting without shutting down."
             )
@@ -218,9 +263,12 @@ def background_status(db: Session) -> BackgroundStatus:
             f"A task has been waiting {oldest // 60} minutes to start; "
             "the workers may be overloaded."
         )
+    # Some failures are expected (an unreadable scan, an unknown vehicle):
+    # worth a look, but not a sign that background work is broken.
+    warnings: list[str] = []
     failed = sum(q.failed_last_day for q in queue)
     if failed:
-        problems.append(
+        warnings.append(
             f"{_plural(failed, 'task', 'tasks')} failed in the last 24 hours."
         )
     midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -233,6 +281,7 @@ def background_status(db: Session) -> BackgroundStatus:
         checked_at=now,
         healthy=not problems,
         problems=problems,
+        warnings=warnings,
         workers=workers,
         queue=queue,
         daily_jobs=daily,

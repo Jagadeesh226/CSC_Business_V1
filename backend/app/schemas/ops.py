@@ -70,6 +70,9 @@ class BackgroundStatus(BaseModel):
     healthy: bool
     # Plain sentences for the admin, most urgent first; empty when healthy.
     problems: list[str]
+    # Worth a look, but not a sign that background work is broken (such as
+    # tasks that failed for good: a scan nobody could read).
+    warnings: list[str]
     workers: list[WorkerStatus]
     queue: list[TaskTypeCounts]
     daily_jobs: list[DailyJobStatus]

@@ -1,7 +1,8 @@
 """worker heartbeats (Phase 5.0)
 
 One row per worker process, refreshed every half minute, so an admin can
-see whether background work is running.
+see whether background work is running; and an index for counting the
+tasks finished in the last day.
 
 Revision ID: c5d8e1f2a3b4
 Revises: 9a0ef3bf74d8
@@ -46,8 +47,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("worker_name"),
     )
+    # The admin overview counts tasks finished in the last day.
+    op.create_index(
+        "ix_background_tasks_finished_at", "background_tasks", ["finished_at"]
+    )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_index("ix_background_tasks_finished_at", table_name="background_tasks")
     op.drop_table("worker_heartbeats")
