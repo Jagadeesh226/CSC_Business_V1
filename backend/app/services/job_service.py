@@ -244,46 +244,96 @@ def list_jobs(
     sort: JobSort = JobSort.NEWEST,
     payment: PaymentFilter | None = None,
 ) -> JobListResponse:
-    search = search.strip() if search else None
     rows, total = repo.list_jobs(
         db,
         offset=(page - 1) * page_size,
         limit=page_size,
-        search=search or None,
-        customer_id=customer_id,
-        service_id=service_id,
-        status=status.value if status is not None else None,
-        due_date=due_date,
-        assigned_to=assigned_to,
-        visible_to=None if viewer is None or is_admin(viewer) else viewer.id,
-        readiness=readiness.value if readiness is not None else None,
-        due=due.value if due is not None else None,
-        today=readiness_repository.business_today(db) if due is not None else None,
-        unassigned=unassigned,
-        payment=payment.value if payment is not None else None,
         sort=sort.value,
+        **_repo_filters(
+            db,
+            viewer,
+            search=search,
+            customer_id=customer_id,
+            service_id=service_id,
+            status=status,
+            due_date=due_date,
+            assigned_to=assigned_to,
+            readiness=readiness,
+            due=due,
+            unassigned=unassigned,
+            payment=payment,
+        ),
     )
-    job_ids = [row[0].id for row in rows]
-    assignees = repo.active_assignees(db, job_ids)
-    progress = readiness_repository.progress_for_jobs(db, job_ids)
-    money = payment_repository.totals_for_jobs(db, job_ids)
-    vehicles = vehicle_repository.refs_for(db, {row[0].vehicle_id for row in rows})
     return JobListResponse(
-        items=[
-            _to_read(
-                row,
-                assignees[i],
-                progress[i],
-                money[i],
-                vehicles.get(row[0].vehicle_id),
-            )
-            for i, row in zip(job_ids, rows, strict=True)
-        ],
+        items=_reads(db, rows),
         total=total,
         page=page,
         page_size=page_size,
         total_pages=math.ceil(total / page_size) if total else 0,
     )
+
+
+def _repo_filters(
+    db: Session,
+    viewer: User | None,
+    *,
+    search: str | None = None,
+    customer_id: int | None = None,
+    service_id: int | None = None,
+    status: JobStatus | None = None,
+    due_date: date | None = None,
+    assigned_to: int | None = None,
+    readiness: Readiness | None = None,
+    due: DueFilter | None = None,
+    unassigned: bool = False,
+    payment: PaymentFilter | None = None,
+) -> dict:
+    search = search.strip() if search else None
+    return {
+        "search": search or None,
+        "customer_id": customer_id,
+        "service_id": service_id,
+        "status": status.value if status is not None else None,
+        "due_date": due_date,
+        "assigned_to": assigned_to,
+        "visible_to": None if viewer is None or is_admin(viewer) else viewer.id,
+        "readiness": readiness.value if readiness is not None else None,
+        "due": due.value if due is not None else None,
+        "today": readiness_repository.business_today(db) if due is not None else None,
+        "unassigned": unassigned,
+        "payment": payment.value if payment is not None else None,
+    }
+
+
+def _reads(db: Session, rows) -> list[JobRead]:
+    job_ids = [row[0].id for row in rows]
+    assignees = repo.active_assignees(db, job_ids)
+    progress = readiness_repository.progress_for_jobs(db, job_ids)
+    money = payment_repository.totals_for_jobs(db, job_ids)
+    vehicles = vehicle_repository.refs_for(db, {row[0].vehicle_id for row in rows})
+    return [
+        _to_read(
+            row,
+            assignees[i],
+            progress[i],
+            money[i],
+            vehicles.get(row[0].vehicle_id),
+        )
+        for i, row in zip(job_ids, rows, strict=True)
+    ]
+
+
+def export_job_ids(db: Session, viewer: User, *, limit: int, **filters) -> list[int]:
+    """The ids of the jobs the viewer may see matching the jobs list's
+    filters, newest first, taken at once (Phase 5.2 exports)."""
+    return repo.matching_job_ids(
+        db, limit=limit, **_repo_filters(db, viewer, **filters)
+    )
+
+
+def reads_for_ids(db: Session, job_ids: list[int]) -> list[JobRead]:
+    """The jobs as the list shows them, in the order given."""
+    return _reads(db, repo.rows_for_ids(db, job_ids))
 
 
 def update_job(

@@ -58,8 +58,9 @@ TASK_LIMITS: dict[str, tuple[int, int]] = {
     "document_ocr": (180, 3),
     "vehicle_expiry_lookup": (120, 3),
     "vehicle_mobile_lookup": (120, 3),
-    # Building a large spreadsheet: a few minutes; a retry rarely helps.
-    "report_export": (300, 2),
+    # Building a large spreadsheet: up to ten minutes. Not retried: a
+    # timeout would only repeat, and the person can simply ask again.
+    "report_export": (600, 1),
 }
 DEFAULT_LIMITS = (120, 3)
 

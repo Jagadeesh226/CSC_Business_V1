@@ -334,3 +334,198 @@ def test_payloads_hold_only_the_export_id(desk, db_session):
     task = db_session.scalar(select(BackgroundTask))
     assert task.payload == {"export_id": asked["id"]}
     assert db_session.scalars(select(Notification)).all() == []
+
+
+# ---------- review fixes ----------
+
+
+def files_in(root):
+    return sorted(p for p in root.rglob("*") if p.is_file())
+
+
+def test_a_job_without_a_service_is_exported(client, desk, db_session):
+    """Review F1: older jobs may have no service."""
+    from app.models import Job
+
+    [job] = jobs_for(desk, "Old job")
+    db_session.get(Job, job["id"]).service_id = None
+    db_session.flush()
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    [row] = sheet(desk.c.get(f"{EXPORTS}/{asked['id']}/file"))
+    assert (row["Title"].value, row["Service"].value) == ("Old job", None)
+
+
+def test_rows_are_read_in_chunks_newest_first(desk, db_session, monkeypatch):
+    """Review F3/F4/F5: one list of ids, read a chunk at a time."""
+    from app.services import export_service
+
+    monkeypatch.setattr(export_service, "EXPORT_CHUNK", 2)
+    made = jobs_for(desk, "One", "Two", "Three", "Four", "Five")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    rows = sheet(desk.c.get(f"{EXPORTS}/{asked['id']}/file"))
+    assert [r["Job no."].value for r in rows] == [
+        j["job_number"] for j in reversed(made)
+    ]
+
+
+def test_vehicle_dates_are_read_in_chunks(desk, db_session, monkeypatch):
+    from app.services import export_service
+
+    monkeypatch.setattr(export_service, "EXPORT_CHUNK", 1)
+    customer = desk.new_customer("Ravi Kumar", "9876543210")["customer"]
+    desk.open_job(customer["id"])
+    for registration in ("GA 07 AB 1001", "GA 07 AB 1002", "GA 07 AB 1003"):
+        vehicle = ok(
+            desk.c.post(
+                f"{API}/vehicles",
+                json={
+                    "customer_id": customer["id"],
+                    "registration_number": registration,
+                    "category": "private_four_wheeler",
+                },
+            ),
+            201,
+        )
+        ok(
+            desk.c.put(
+                f"{API}/vehicles/{vehicle['id']}/expiries/insurance",
+                json={"valid_until": "2027-01-31"},
+            )
+        )
+    asked = ok(ask(desk.c, kind="vehicles"), 202)
+    run_worker(db_session, expect=1)
+    rows = sheet(desk.c.get(f"{EXPORTS}/{asked['id']}/file"), "Vehicles")
+    assert len(rows) == 3
+    assert all(r["Insurance valid until"].value is not None for r in rows)
+
+
+def test_a_run_that_is_not_saved_leaves_no_file(desk, db_session, storage, monkeypatch):
+    """Review F2: timed out or taken over after saving its file."""
+    from app.repositories import task_repository
+
+    jobs_for(desk, "One")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    before = files_in(storage)
+    monkeypatch.setattr(task_repository, "lock_owned", lambda *a, **k: None)
+    run_worker(db_session, expect=1)
+    assert files_in(storage) == before
+    assert db_session.get(ReportExport, asked["id"]).status == "queued"
+
+
+def test_a_stale_run_deletes_its_file(desk, db_session, storage, monkeypatch):
+    from sqlalchemy import update
+
+    jobs_for(desk, "One")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    real_build = report_export_service.build
+
+    def build_then_cancelled(db, export, user):
+        result = real_build(db, export, user)
+        db.execute(
+            update(ReportExport)
+            .where(ReportExport.id == asked["id"])
+            .values(status="failed", failure_reason="Stopped by hand.")
+        )
+        return result
+
+    monkeypatch.setattr(report_export_service, "build", build_then_cancelled)
+    before = files_in(storage)
+    run_worker(db_session, expect=1)
+    assert files_in(storage) == before
+    assert db_session.scalar(select(BackgroundTask)).result == {"skipped": "stale"}
+
+
+def test_recovery_leaves_waiting_tasks_alone(desk, db_session):
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    row = db_session.get(ReportExport, asked["id"])
+    row.created_at = row.created_at - timedelta(minutes=30)
+    db_session.flush()
+    assert report_export_service.recover_stuck(db_session) == 0
+    assert row.status == "queued"
+
+
+def test_the_failure_hook_leaves_a_finished_export(desk, db_session):
+    from app.workers import export_handler
+    from app.workers.registry import TaskInfo
+
+    jobs_for(desk, "One")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    info = TaskInfo(
+        id=1, task_type="report_export", payload={"export_id": asked["id"]}, attempt=1
+    )
+    export_handler.on_export_failed(db_session, info, "Timed out.")
+    assert db_session.get(ReportExport, asked["id"]).status == "completed"
+
+
+def test_finished_exports_do_not_count_as_waiting(desk, db_session):
+    made = [ok(ask(desk.c, kind="jobs"), 202) for _ in range(3)]
+    for m in made:
+        db_session.get(ReportExport, m["id"]).status = "failed"
+    db_session.flush()
+    ok(ask(desk.c, kind="jobs"), 202)
+
+
+def test_twenty_a_day(desk, db_session, monkeypatch):
+    """Review F10."""
+    monkeypatch.setattr(report_export_service, "MAX_PER_DAY", 2)
+    for _ in range(2):
+        made = ok(ask(desk.c, kind="jobs"), 202)
+        db_session.get(ReportExport, made["id"]).status = "failed"
+        db_session.flush()
+    refused = ask(desk.c, kind="jobs")
+    assert refused.status_code == 409
+    assert "2 exports today" in refused.json()["detail"]
+
+
+def test_corrupted_file_bytes_are_refused(desk, db_session):
+    """Review F7: the storage's own check catches tampering."""
+    jobs_for(desk, "One")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    path = get_storage()._path(db_session.get(ReportExport, asked["id"]).storage_key)
+    data = bytearray(path.read_bytes())
+    data[-1] ^= 0xFF
+    path.write_bytes(bytes(data))
+    response = desk.c.get(f"{EXPORTS}/{asked['id']}/file")
+    assert response.status_code == 410
+    assert "damaged" in response.json()["detail"]
+
+
+def test_a_changed_role_withdraws_the_file(client, admin_user, db_session, desk):
+    """Review F6: built with admin access, no longer an admin."""
+    jobs_for(desk, "One")
+    asked = ok(ask(client, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    assert db_session.get(ReportExport, asked["id"]).built_role == "admin"
+    admin_user.role = "employee"
+    db_session.flush()
+    response = client.get(f"{EXPORTS}/{asked['id']}/file")
+    assert response.status_code == 410
+    assert "access has changed" in response.json()["detail"]
+
+
+def test_system_failures_get_a_plain_reason(desk, db_session):
+    """Review F9: "Timed out." is not shown to the person."""
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    row = db_session.get(ReportExport, asked["id"])
+    report_export_service.fail(db_session, row, "Timed out.")
+    assert row.failure_reason == report_export_service.GENERIC_FAILURE
+    report_export_service.fail(db_session, row, "More than 5 jobs match; narrow it.")
+    assert row.failure_reason == "More than 5 jobs match; narrow it."
+
+
+def test_an_undeleted_file_keeps_its_record(desk, db_session, monkeypatch):
+    """Review F8: kept, to try again, rather than forgetting the file."""
+    jobs_for(desk, "One")
+    asked = ok(ask(desk.c, kind="jobs"), 202)
+    run_worker(db_session, expect=1)
+    row = db_session.get(ReportExport, asked["id"])
+    row.expires_at = row.finished_at - timedelta(seconds=1)
+    db_session.flush()
+    storage = get_storage()
+    monkeypatch.setattr(type(storage), "delete", lambda self, key: None)
+    assert report_export_service.expire_files(db_session) == 0
+    assert row.status == "completed" and row.storage_key is not None

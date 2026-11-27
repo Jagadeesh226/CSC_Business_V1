@@ -257,6 +257,31 @@ def count_jobs(db: Session, **filters) -> int:
     return int(db.scalar(_count(*_job_filters(**filters))) or 0)
 
 
+def matching_job_ids(db: Session, *, limit: int, **filters) -> list[int]:
+    """Ids of the jobs matching the ``list_jobs`` filters, newest first, in
+    one query: a single consistent snapshot for exports (Phase 5.2)."""
+    conditions, progress = _job_filters(**filters)
+    stmt = select(Job.id)
+    if progress is not None:
+        stmt = stmt.outerjoin(progress, progress.c.job_id == Job.id)
+    return list(
+        db.scalars(
+            stmt.where(*conditions)
+            .order_by(Job.created_at.desc(), Job.id.desc())
+            .limit(limit)
+        )
+    )
+
+
+def rows_for_ids(db: Session, job_ids: list[int]) -> list[JobRow]:
+    """The jobs (with customer and service), in the order of ``job_ids``."""
+    found = {
+        row[0].id: row
+        for row in db.execute(_with_relations().where(Job.id.in_(job_ids))).all()
+    }
+    return [found[i] for i in job_ids if i in found]
+
+
 def list_jobs(
     db: Session, *, offset: int, limit: int, sort: str = "newest", **filters
 ) -> tuple[list[JobRow], int]:

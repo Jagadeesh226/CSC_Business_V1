@@ -37,6 +37,8 @@ class Storage(Protocol):
 
     def delete(self, storage_key: str) -> None: ...
 
+    def exists(self, storage_key: str) -> bool: ...
+
 
 def generate_key() -> str:
     return base64.urlsafe_b64encode(AESGCM.generate_key(bit_length=256)).decode()
@@ -87,6 +89,9 @@ class LocalEncryptedStorage:
             self._path(storage_key).unlink(missing_ok=True)
         except (OSError, ValueError):
             pass
+
+    def exists(self, storage_key: str) -> bool:
+        return self._path(storage_key).exists()
 
     def load(self, storage_key: str) -> bytes:
         sealed = self._path(storage_key).read_bytes()

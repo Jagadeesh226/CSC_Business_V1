@@ -61,6 +61,9 @@ class ReportExport(Base):
     sha256: Mapped[str | None] = mapped_column(String(64))
     # A fixed, safe sentence shown to the person who asked.
     failure_reason: Mapped[str | None] = mapped_column(String(300))
+    # The requester's role when it was built: if it changes, the file (built
+    # with the old access) is no longer handed out.
+    built_role: Mapped[str | None] = mapped_column(String(50))
     download_count: Mapped[int] = mapped_column(
         Integer, server_default="0", nullable=False
     )

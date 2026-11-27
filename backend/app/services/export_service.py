@@ -164,12 +164,16 @@ def _header(ws, headers: list[str]) -> None:
 
 
 def _about(wb, viewer: User, details: list[tuple[str, object]]) -> None:
+    _about_named(wb, viewer.name, details)
+
+
+def _about_named(wb, viewer_name: str, details: list[tuple[str, object]]) -> None:
     """Export details on their own sheet, out of the way of sorting."""
     about = wb.create_sheet("About")
     exported_at = datetime.now(ZoneInfo(BUSINESS_TIMEZONE))
     for label, value in (
         ("Exported at (IST)", exported_at.strftime("%d-%m-%Y %H:%M")),
-        ("Exported by", viewer.name),
+        ("Exported by", viewer_name),
         *details,
     ):
         about.append([_cell(about, label), _cell(about, value)])
@@ -214,8 +218,12 @@ def build_vehicles(
     if len(rows) > max_rows:
         raise _too_many("vehicles", max_rows)
     vehicles = [v for v, _ in rows]
-    expiries = vehicle_repository.current_expiries(db, [v.id for v in vehicles])
-    users = users_by_id(db, {v.assigned_to for v in vehicles})
+    expiries: dict = {}
+    users: dict = {}
+    for start in range(0, len(vehicles), EXPORT_CHUNK):
+        chunk = vehicles[start : start + EXPORT_CHUNK]
+        expiries.update(vehicle_repository.current_expiries(db, [v.id for v in chunk]))
+        users.update(users_by_id(db, {v.assigned_to for v in chunk}))
     window = max(DUE_WINDOW_DAYS, due_within_days or 0)
 
     wb = Workbook(write_only=True)
@@ -307,19 +315,24 @@ PAYMENT_LABELS = {
     "paid": "Paid",
     "overpaid": "Overpaid",
 }
-_JOB_PAGE = 200
+# Rows read at a time (also keeps every IN list far below PostgreSQL's
+# 65,535 bind parameters).
+EXPORT_CHUNK = 500
 
 
 def build_jobs(
     db: Session, viewer: User, *, max_rows: int, **filters
 ) -> tuple[str, bytes, int]:
     """(filename, file bytes, rows) for the jobs the viewer may see, with
-    the same filters as the jobs list. Builds only: no audit, no commit."""
-    first = job_service.list_jobs(
-        db, page=1, page_size=_JOB_PAGE, viewer=viewer, **filters
-    )
-    if first.total > max_rows:
+    the same filters as the jobs list. Builds only: no audit, no commit.
+
+    The matching ids are taken in one query, so the file is one consistent
+    list (no job twice or missing while others change); the rows are then
+    read in chunks, and the session is cleared after each one."""
+    job_ids = job_service.export_job_ids(db, viewer, limit=max_rows + 1, **filters)
+    if len(job_ids) > max_rows:
         raise _too_many("jobs", max_rows)
+    viewer_name = viewer.name
     today = business_today(db)
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("Jobs")
@@ -346,9 +359,9 @@ def build_jobs(
         ],
     )
     ist = ZoneInfo(BUSINESS_TIMEZONE)
-    page, rows, count = 1, first, 0
-    while True:
-        for job in rows.items:
+    count = 0
+    for start in range(0, len(job_ids), EXPORT_CHUNK):
+        for job in job_service.reads_for_ids(db, job_ids[start : start + EXPORT_CHUNK]):
             money = job.payment_summary
             progress = job.document_progress
             values = [
@@ -356,7 +369,8 @@ def build_jobs(
                 job.created_at.astimezone(ist).strftime("%d-%m-%Y %H:%M"),
                 JOB_STATUS_LABELS.get(job.status, job.status),
                 job.title,
-                job.service.name,
+                # Older jobs may have no service (before the catalogue).
+                job.service.name if job.service else None,
                 job.customer.id,
                 job.customer.name,
                 mask_phone(job.customer.phone),
@@ -372,15 +386,10 @@ def build_jobs(
             ]
             ws.append([_cell(ws, value) for value in values])
             count += 1
-        if page >= rows.total_pages:
-            break
-        page += 1
-        rows = job_service.list_jobs(
-            db, page=page, page_size=_JOB_PAGE, viewer=viewer, **filters
-        )
-    _about(
+        db.expunge_all()  # keep memory flat over large exports
+    _about_named(
         wb,
-        viewer,
+        viewer_name,
         [("Jobs", count)]
         + [
             (name.replace("_", " ").capitalize(), str(getattr(value, "value", value)))

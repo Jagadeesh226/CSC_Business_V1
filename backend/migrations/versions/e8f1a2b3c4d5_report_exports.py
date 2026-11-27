@@ -45,6 +45,7 @@ def upgrade() -> None:
     sa.Column('file_size', sa.Integer(), nullable=True),
     sa.Column('sha256', sa.String(length=64), nullable=True),
     sa.Column('failure_reason', sa.String(length=300), nullable=True),
+    sa.Column('built_role', sa.String(length=50), nullable=True),
     sa.Column('download_count', sa.Integer(), server_default='0', nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
