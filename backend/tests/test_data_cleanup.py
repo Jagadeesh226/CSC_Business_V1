@@ -143,7 +143,7 @@ def test_a_task_named_by_an_ocr_result_stays(db_session, make_customer):
 
 def test_only_read_notifications_go(db_session, employee_user):
     old_read = note(db_session, employee_user, read_days=91)
-    new_read = note(db_session, employee_user, read_days=30)
+    new_read = note(db_session, employee_user, read_days=60)
     unread = note(db_session, employee_user)
     unread.created_at = ago(400)
     db_session.flush()
@@ -189,6 +189,17 @@ def test_captcha_leftovers_are_cleared_on_finished_lookups(db_session, make_cust
     )
     db_session.add(finished)
     db_session.flush()
+    others = [
+        VehicleLookup(
+            vehicle_id=vehicle.id,
+            status=status,
+            captcha_png=b"png",
+            state_sealed=b"state",
+            captcha_answer_sealed=b"answer",
+        )
+        for status in ("failed", "expired")
+    ]
+    db_session.add_all(others)
     waiting = VehicleLookup(
         vehicle_id=vehicle.id, status="waiting_for_captcha", captcha_png=b"png"
     )
@@ -202,6 +213,9 @@ def test_captcha_leftovers_are_cleared_on_finished_lookups(db_session, make_cust
         finished.state_sealed,
         finished.captcha_answer_sealed,
     ) == (None, None, None)
+    for other in others:
+        db_session.refresh(other)
+        assert (other.captcha_png, other.state_sealed) == (None, None)
     assert waiting.captcha_png == b"png"  # someone is about to answer it
 
 
@@ -262,6 +276,14 @@ def test_once_a_day_and_audited_with_counts(db_session, employee_user):
 
 def test_a_big_backlog_continues_on_the_next_loop(db_session, monkeypatch):
     monkeypatch.setattr(cleanup_service, "BATCH", 2)
+    today = business_today(db_session)
+    db_session.execute(
+        text(
+            "INSERT INTO daily_runs (name, business_date) "
+            "VALUES ('vehicle_expiry_check', :d) ON CONFLICT DO NOTHING"
+        ),
+        {"d": today},
+    )
     for _ in range(5):
         task(db_session, "succeeded", finished_days=40)
     assert run(db_session) == 2
@@ -277,6 +299,25 @@ def test_a_big_backlog_continues_on_the_next_loop(db_session, monkeypatch):
         )
     ]
     assert finished == [False, False, True]
+    # Only its own marker is taken back: the reminder check stays done.
+    assert db_session.scalar(
+        select(DailyRun).where(
+            DailyRun.name == "vehicle_expiry_check", DailyRun.business_date == today
+        )
+    )
+
+
+@pytest.mark.parametrize("kind", ["notifications", "sessions"])
+def test_every_table_can_continue(db_session, employee_user, monkeypatch, kind):
+    monkeypatch.setattr(cleanup_service, "BATCH", 2)
+    for _ in range(3):
+        if kind == "notifications":
+            note(db_session, employee_user, read_days=100)
+        else:
+            session_row(db_session, employee_user, expires_days=-40)
+    assert run(db_session) == 2
+    assert run(db_session) == 1  # carried on the same day
+    assert run(db_session) == 0
 
 
 def test_another_worker_running_it_is_left_alone(db_session, test_engine):
@@ -322,3 +363,72 @@ def test_it_runs_in_the_worker_loop():
         registry._REGISTRY.clear()
         registry._REGISTRY.update(saved[0])
         registry._MAINTENANCE[:] = saved[1]
+
+
+# ---------- review fixes ----------
+
+
+def reminder_with_note(db, make_customer, user, status, read_days):
+    from app.models import VehicleReminder
+
+    customer = make_customer()
+    vehicle = Vehicle(
+        customer_id=customer.id,
+        registration_number=f"GA 07 AB {next(_n):04d}",
+        registration_key=f"GA07AB{next(_n):04d}",
+        category="private_four_wheeler",
+        assigned_to=user.id,
+    )
+    db.add(vehicle)
+    db.flush()
+    reminder = VehicleReminder(
+        vehicle_id=vehicle.id,
+        expiry_type="insurance",
+        valid_until=business_today(db) - timedelta(days=80),
+        status=status,
+    )
+    db.add(reminder)
+    db.flush()
+    row = Notification(
+        user_id=user.id,
+        kind="vehicle_expiry",
+        reminder_id=reminder.id,
+        title="GA 07 AB: insurance",
+        body="Insurance expires.",
+        read_at=ago(read_days),
+    )
+    db.add(row)
+    db.flush()
+    return reminder, row
+
+
+def test_an_open_reminder_keeps_its_read_notification(
+    db_session, make_customer, employee_user
+):
+    """Review M-1: deleting it would make the daily reminder check send it
+    again, unread, every three months."""
+    from app.services import reminder_service
+
+    reminder, kept = reminder_with_note(
+        db_session, make_customer, employee_user, "open", read_days=100
+    )
+    _, gone = reminder_with_note(
+        db_session, make_customer, employee_user, "done", read_days=100
+    )
+    run(db_session)
+    assert alive(db_session, Notification, kept.id)
+    assert not alive(db_session, Notification, gone.id)
+    # And the reminder check finds its notification, so sends nothing new.
+    db_session.execute(
+        text("DELETE FROM daily_runs WHERE name = :n"),
+        {"n": reminder_service.DAILY_JOB},
+    )
+    db_session.flush()
+    reminder_service.run_daily(db_session)
+    db_session.flush()
+    assert (
+        db_session.scalar(
+            select(func.count()).where(Notification.reminder_id == reminder.id)
+        )
+        == 1
+    )

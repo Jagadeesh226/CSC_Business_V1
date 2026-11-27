@@ -7,7 +7,8 @@ worker only), rows past their retention period are removed:
   (default 30) or failed over RETENTION_FAILED_TASKS_DAYS ago (90), except
   those an OCR result still names as its source;
 - notifications read over RETENTION_READ_NOTIFICATIONS_DAYS ago (90);
-  unread ones stay;
+  unread ones stay, and so do those of vehicle reminders still open (the
+  daily reminder check would send those again);
 - sign-in sessions that expired or were signed out over
   RETENTION_ENDED_SESSIONS_DAYS ago (30);
 - daily-run markers over 180 days old;
@@ -26,7 +27,7 @@ counts only.
 import logging
 from datetime import timedelta
 
-from sqlalchemy import and_, delete, exists, func, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,7 @@ from app.models import (
     OcrResult,
     UserSession,
     VehicleLookup,
+    VehicleReminder,
 )
 from app.repositories.readiness_repository import business_today
 from app.services import audit_service
@@ -45,6 +47,7 @@ from app.services import audit_service
 DAILY_JOB = "data_cleanup"
 BATCH = 5000
 KEEP_DAILY_RUNS_DAYS = 180
+STATEMENT_TIMEOUT_MS = 60_000
 log = logging.getLogger(__name__)
 
 
@@ -54,7 +57,12 @@ def _days_ago(days: int):
 
 def _delete_batch(db: Session, model, condition) -> int:
     ids = select(model.id).where(condition).order_by(model.id).limit(BATCH)
-    return db.execute(delete(model).where(model.id.in_(ids.scalar_subquery()))).rowcount
+    # The condition again on the outer DELETE: if a row changed while the
+    # delete waited for its lock (e.g. a failed task retried), PostgreSQL
+    # re-checks only the outer condition, so the row is then kept.
+    return db.execute(
+        delete(model).where(model.id.in_(ids.scalar_subquery()), condition)
+    ).rowcount
 
 
 def _old_tasks(settings):
@@ -80,6 +88,12 @@ def _old_notifications(settings):
     return and_(
         Notification.read_at.is_not(None),
         Notification.read_at < _days_ago(settings.retention_read_notifications_days),
+        # A vehicle reminder still open keeps its notification: the daily
+        # reminder check would otherwise send it again, unread.
+        ~exists().where(
+            VehicleReminder.id == Notification.reminder_id,
+            VehicleReminder.status == "open",
+        ),
     )
 
 
@@ -127,6 +141,9 @@ def run_daily(db: Session) -> int:
     )
     if claimed is None:
         return 0
+    # A large first run must not hold the worker for long: it carries on
+    # in the next loop instead (a full batch is not marked done).
+    db.execute(text(f"SET LOCAL statement_timeout = {STATEMENT_TIMEOUT_MS}"))
     settings = get_settings()
     counts = {
         "background_tasks": _delete_batch(db, BackgroundTask, _old_tasks(settings)),
