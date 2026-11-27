@@ -58,6 +58,8 @@ TASK_LIMITS: dict[str, tuple[int, int]] = {
     "document_ocr": (180, 3),
     "vehicle_expiry_lookup": (120, 3),
     "vehicle_mobile_lookup": (120, 3),
+    # Building a large spreadsheet: a few minutes; a retry rarely helps.
+    "report_export": (300, 2),
 }
 DEFAULT_LIMITS = (120, 3)
 

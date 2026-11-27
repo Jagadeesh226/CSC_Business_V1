@@ -16,6 +16,7 @@ class TaskType(StrEnum):
     DOCUMENT_OCR = "document_ocr"
     VEHICLE_EXPIRY_LOOKUP = "vehicle_expiry_lookup"
     VEHICLE_MOBILE_LOOKUP = "vehicle_mobile_lookup"
+    REPORT_EXPORT = "report_export"
 
 
 class TaskRead(BaseModel):

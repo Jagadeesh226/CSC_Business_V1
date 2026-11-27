@@ -14,6 +14,7 @@ from app.models.ocr import OcrResult
 from app.models.payment import PAYMENT_METHODS, Payment
 from app.models.receipt import Receipt
 from app.models.reminder import DailyRun, Notification, VehicleReminder
+from app.models.report_export import EXPORT_KINDS, ReportExport
 from app.models.sequence_counter import SequenceCounter
 from app.models.service import Service
 from app.models.service_category import ServiceCategory
@@ -33,6 +34,7 @@ from app.models.worker_heartbeat import WorkerHeartbeat
 
 __all__ = [
     "EXPIRY_TYPES",
+    "EXPORT_KINDS",
     "PAYMENT_METHODS",
     "TASK_TYPES",
     "VEHICLE_CATEGORIES",
@@ -53,6 +55,7 @@ __all__ = [
     "OcrResult",
     "Payment",
     "Receipt",
+    "ReportExport",
     "SequenceCounter",
     "Service",
     "ServiceCategory",
