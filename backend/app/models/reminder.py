@@ -75,6 +75,9 @@ NOTIFICATION_KINDS = (
     "ocr_failed",
     "lookup_captcha",
     "task_failed",
+    # Phase 5.2: background exports.
+    "export_ready",
+    "export_failed",
 )
 
 
@@ -91,7 +94,7 @@ class Notification(Base):
         UniqueConstraint("user_id", "event_key", name="uq_notifications_event"),
         CheckConstraint(
             "kind IN ('vehicle_expiry', 'job_assigned', 'ocr_failed', "
-            "'lookup_captcha', 'task_failed')",
+            "'lookup_captcha', 'task_failed', 'export_ready', 'export_failed')",
             name="ck_notifications_kind",
         ),
         CheckConstraint("occurrences >= 1", name="ck_notifications_occurrences"),
@@ -122,6 +125,14 @@ class Notification(Base):
         ForeignKey(
             "vehicle_lookups.id",
             name="fk_notifications_vehicle_lookup",
+            ondelete="SET NULL",
+        ),
+        index=True,
+    )
+    report_export_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "report_exports.id",
+            name="fk_notifications_report_export",
             ondelete="SET NULL",
         ),
         index=True,

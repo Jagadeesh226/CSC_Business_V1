@@ -107,13 +107,15 @@ class NotificationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    # vehicle_expiry, job_assigned, ocr_failed, lookup_captcha, task_failed
+    # vehicle_expiry, job_assigned, ocr_failed, lookup_captcha, task_failed,
+    # export_ready, export_failed
     kind: str
     reminder_id: int | None
     # Phase 5.1: what it is about, for a link (unset ones are null).
     job_id: int | None = None
     document_id: int | None = None
     vehicle_lookup_id: int | None = None
+    report_export_id: int | None = None
     task_type: str | None = None
     # How many times it happened (task failures in the same hour).
     occurrences: int = 1

@@ -37,12 +37,20 @@ from app.schemas.job import FINAL_STATUSES
 
 # Everything that asks a person to do something (not vehicle expiries,
 # which follow the vehicle's responsible employee).
-WORK_KINDS = ("job_assigned", "ocr_failed", "lookup_captcha", "task_failed")
+WORK_KINDS = (
+    "job_assigned",
+    "ocr_failed",
+    "lookup_captcha",
+    "task_failed",
+    "export_ready",
+    "export_failed",
+)
 
 TASK_LABELS = {
     "document_ocr": "document reading (OCR)",
     "vehicle_expiry_lookup": "vehicle lookup",
     "vehicle_mobile_lookup": "mobile number lookup",
+    "report_export": "Excel export",
 }
 
 
@@ -305,3 +313,52 @@ def task_failed(db: Session, task_type: str) -> None:
                 ),
             )
         )
+
+
+# ---------- exports (Phase 5.2) ----------
+
+_EXPORT_NAMES = {"vehicles": "vehicles", "jobs": "jobs"}
+
+
+def export_ready(db: Session, export) -> None:
+    user = _active(db, export.requested_by)
+    if user is None:
+        return
+    until = db.scalar(
+        select(
+            func.to_char(func.timezone("Asia/Kolkata", export.expires_at), "HH24:MI")
+        )
+    )
+    rows = "row" if export.row_count == 1 else "rows"
+    _insert(
+        db,
+        user.id,
+        "export_ready",
+        f"export_ready:{export.id}",
+        report_export_id=export.id,
+        title=f"Your {_EXPORT_NAMES[export.kind]} export is ready",
+        body=(
+            f"{export.row_count} {rows}. Download it before {until} IST tomorrow; "
+            "after that it is deleted."
+        ),
+    )
+
+
+def export_failed(db: Session, export) -> None:
+    user = _active(db, export.requested_by)
+    if user is None:
+        return
+    _insert(
+        db,
+        user.id,
+        "export_failed",
+        f"export_failed:{export.id}",
+        report_export_id=export.id,
+        title=f"Your {_EXPORT_NAMES[export.kind]} export could not be made",
+        body=export.failure_reason or "Ask for a new export.",
+    )
+
+
+def export_downloaded(db: Session, export_id: int) -> None:
+    """Downloaded or expired: nothing left to do about it."""
+    settle(db, kinds=("export_ready",), report_export_id=export_id)

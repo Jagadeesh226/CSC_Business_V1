@@ -291,6 +291,7 @@ def test_queue_counts_by_type(client, db_session, ran_today):
         "document_ocr",
         "vehicle_expiry_lookup",
         "vehicle_mobile_lookup",
+        "report_export",
     }
     lookup = queue["vehicle_expiry_lookup"]
     assert {k: v for k, v in lookup.items() if k != "oldest_due_seconds"} == {

@@ -15,7 +15,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
-TASK_TYPES = ("document_ocr", "vehicle_expiry_lookup", "vehicle_mobile_lookup")
+TASK_TYPES = (
+    "document_ocr",
+    "vehicle_expiry_lookup",
+    "vehicle_mobile_lookup",
+    "report_export",
+)
 TASK_STATUSES = ("queued", "running", "succeeded", "failed")
 
 
@@ -31,7 +36,7 @@ class BackgroundTask(Base):
     __table_args__ = (
         CheckConstraint(
             "task_type IN ('document_ocr', 'vehicle_expiry_lookup', "
-            "'vehicle_mobile_lookup')",
+            "'vehicle_mobile_lookup', 'report_export')",
             name="ck_background_tasks_type",
         ),
         CheckConstraint(
