@@ -38,7 +38,10 @@ class OcrResult(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), nullable=False)
     document_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    task_id: Mapped[int | None] = mapped_column(ForeignKey("background_tasks.id"))
+    # Indexed: the daily clean-up checks that no result names a task.
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("background_tasks.id"), index=True
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     provider: Mapped[str] = mapped_column(String(100), nullable=False)
     provider_version: Mapped[str] = mapped_column(String(100), nullable=False)

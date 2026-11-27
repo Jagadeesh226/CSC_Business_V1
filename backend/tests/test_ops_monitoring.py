@@ -66,17 +66,18 @@ def add_task(db, status="queued", *, due_minutes=0.0, finished_minutes=None, **k
 
 @pytest.fixture
 def ran_today(db_session):
-    """The daily check already ran today, so it raises no problem."""
+    """The daily jobs already ran today, so they raise no problem."""
     today = db_session.scalar(
         select(func.date(func.timezone("Asia/Kolkata", func.now())))
     )
-    db_session.execute(
-        text(
-            "INSERT INTO daily_runs (name, business_date) VALUES (:n, :d) "
-            "ON CONFLICT DO NOTHING"
-        ),
-        {"n": reminder_service.DAILY_JOB, "d": today},
-    )
+    for name in ops_service.DAILY_JOBS:
+        db_session.execute(
+            text(
+                "INSERT INTO daily_runs (name, business_date) VALUES (:n, :d) "
+                "ON CONFLICT DO NOTHING"
+            ),
+            {"n": name, "d": today},
+        )
     db_session.flush()
 
 
@@ -343,7 +344,9 @@ def test_overview_shows_no_task_contents(client, db_session, ran_today):
 # ---------- overview: daily jobs ----------
 
 
-def test_daily_check_not_run_today_is_a_problem(client, db_session, monkeypatch):
+def test_daily_check_not_run_today_is_a_problem(
+    client, db_session, ran_today, monkeypatch
+):
     add_worker(db_session, "w:1", seen=0.1, active=0.1)
     db_session.execute(
         text("DELETE FROM daily_runs WHERE name = :n"),
@@ -361,7 +364,8 @@ def test_daily_check_not_run_today_is_a_problem(client, db_session, monkeypatch)
     # Not in the first minutes after midnight, whatever the time now.
     monkeypatch.setattr(ops_service, "DAILY_GRACE", timedelta(seconds=-1))
     body = client.get(OVERVIEW).json()
-    [job] = body["daily_jobs"]
+    job, cleanup = body["daily_jobs"]
+    assert cleanup["label"] == "Data clean-up"
     assert (job["label"], job["ran_today"]) == ("Vehicle expiry check", False)
     assert job["last_business_date"] is not None
     assert body["problems"] == ["The vehicle expiry check has not run today."]
@@ -386,7 +390,7 @@ def test_the_business_date_is_indian_time(client, db_session, monkeypatch):
         DailyRun(name=reminder_service.DAILY_JOB, business_date=local.date())
     )
     db_session.flush()
-    [job] = client.get(OVERVIEW).json()["daily_jobs"]
+    job = client.get(OVERVIEW).json()["daily_jobs"][0]
     assert job["ran_today"] is True
 
 
