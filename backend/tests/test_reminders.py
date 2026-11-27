@@ -331,7 +331,13 @@ def test_daily_check_runs_in_the_real_worker(desk, customer, today, db_session):
     from app.workers import registry
 
     before = registry.maintenance_jobs()
-    import app.workers.handlers  # noqa: F401 - registers jobs, as the worker does
+    import importlib
+
+    from app.workers import reminder_jobs
+
+    # As the worker's start-up import does; reloaded, so it registers
+    # whichever test imported the module first.
+    importlib.reload(reminder_jobs)
 
     assert reminder_service.run_daily in registry.maintenance_jobs()
     v = add_vehicle(desk, customer.id)
