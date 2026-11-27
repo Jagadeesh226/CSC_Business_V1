@@ -27,7 +27,7 @@ from app.schemas.ops import (
     WorkerStatus,
 )
 from app.schemas.task import TaskType
-from app.services import reminder_service
+from app.services import cleanup_service, reminder_service
 from app.workers import notifier
 
 log = logging.getLogger(__name__)
@@ -49,7 +49,10 @@ NOT_REPORTING_PROBLEM_FOR = timedelta(hours=1)
 READINESS_CACHE_SECONDS = 2.0
 _READINESS_DB_TIMEOUT_MS = 2000
 
-DAILY_JOBS = {reminder_service.DAILY_JOB: "Vehicle expiry check"}
+DAILY_JOBS = {
+    reminder_service.DAILY_JOB: "Vehicle expiry check",
+    cleanup_service.DAILY_JOB: "Data clean-up",
+}
 
 
 _cache_lock = threading.Lock()

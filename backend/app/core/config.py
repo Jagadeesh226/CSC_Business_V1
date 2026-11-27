@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +27,14 @@ class Settings(BaseSettings):
     # Optional TTF font for receipts (RECEIPT_FONT_PATH), for names in
     # characters the built-in font cannot print.
     receipt_font_path: str = ""
+
+    # Retention (Phase 5.3), in days, for working data the daily clean-up
+    # removes. Audit logs, documents, payments and receipts are never
+    # removed by it. At least 7 days, so a typo cannot wipe recent data.
+    retention_succeeded_tasks_days: int = Field(30, ge=7, le=3650)
+    retention_failed_tasks_days: int = Field(90, ge=7, le=3650)
+    retention_read_notifications_days: int = Field(90, ge=7, le=3650)
+    retention_ended_sessions_days: int = Field(30, ge=7, le=3650)
 
 
 @lru_cache(maxsize=1)
