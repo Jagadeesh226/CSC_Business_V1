@@ -25,8 +25,8 @@ function useDebounced<T>(value: T, ms: number): T {
 const MIN_CHARS = 2
 const GROUPS: Item['group'][] = ['Customers', 'Jobs', 'Vehicles']
 
-/** Search dialog. Mount it only while open: focus is taken on mount and restored on unmount. */
-export function CommandPalette({ onClose }: { onClose: () => void }) {
+/** Search dialog. Mount it only while open: focus moves to the input on mount. */
+export function CommandPalette({ onClose }: { onClose: (opts: { restoreFocus: boolean }) => void }) {
   const navigate = useNavigate()
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -35,10 +35,10 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const search = useDebounced(term.trim(), 250)
   const enabled = search.length >= MIN_CHARS
 
+  // Focus goes to the input on open. Giving focus back is the opener's job (AppShell),
+  // because only it knows the opener from before the page went inert.
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
     inputRef.current?.focus()
-    return () => previous?.focus?.()
   }, [])
 
   const query = { search, page_size: 5 }
@@ -99,14 +99,14 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   }, [activeId])
 
   const choose = (item: Item) => {
-    onClose()
+    onClose({ restoreFocus: false })
     navigate(item.to)
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault()
-      onClose()
+      onClose({ restoreFocus: true })
     } else if (e.key === 'ArrowDown' && items.length) {
       e.preventDefault()
       setActive((activeIndex + 1) % items.length)
@@ -132,7 +132,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     <div
       className="palette-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) onClose({ restoreFocus: true })
       }}
     >
       <div className="palette" role="dialog" aria-modal="true" aria-label="Search" onKeyDown={onKeyDown}>

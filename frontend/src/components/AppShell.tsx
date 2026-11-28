@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLogout, useMe } from '../auth/useAuth'
 import { CENTRE_NAME } from '../config'
@@ -22,12 +22,34 @@ export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
+  const searchRef = useRef<HTMLButtonElement>(null)
+  const openerRef = useRef<HTMLElement | null>(null)
+  const restoreRef = useRef(false)
+
+  // Remember who opened the palette before the page goes inert.
+  const openPalette = () => {
+    const active = document.activeElement
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null
+    setPaletteOpen(true)
+  }
+  const closePalette = ({ restoreFocus }: { restoreFocus: boolean }) => {
+    restoreRef.current = restoreFocus
+    setPaletteOpen(false)
+  }
+  // Runs after the shell is no longer inert, so focus() can succeed.
+  useLayoutEffect(() => {
+    if (paletteOpen || !restoreRef.current) return
+    restoreRef.current = false
+    const opener = openerRef.current
+    const target = opener?.isConnected ? opener : searchRef.current
+    target?.focus()
+  }, [paletteOpen])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen(true)
+        openPalette()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -89,7 +111,8 @@ export function AppShell() {
           Menu
         </button>
         <span className="centre-name">{CENTRE_NAME}</span>
-        <button type="button" className="btn" onClick={() => setPaletteOpen(true)}>
+        <button type="button" className="btn" ref={searchRef}
+          onClick={openPalette}>
           Search<span className="visually-hidden"> customers, jobs and vehicles</span>
           <small className="shortcut-hint" aria-hidden="true">{isMac ? '⌘K' : 'Ctrl+K'}</small>
         </button>
@@ -135,7 +158,7 @@ export function AppShell() {
         </main>
       </div>
     </div>
-    {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+    {paletteOpen && <CommandPalette onClose={closePalette} />}
     </>
   )
 }

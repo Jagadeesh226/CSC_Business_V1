@@ -1,7 +1,9 @@
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { emptyDashboard, emptyQueue, employeeUser, renderApp, stubFetch } from '../test/utils'
+import { AppRoutes } from '../routes'
+import { emptyDashboard, emptyQueue, employeeUser, renderApp, renderWithProviders, stubFetch } from '../test/utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -114,5 +116,63 @@ describe('command palette', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
     // @ts-expect-error remove the stub again so other tests see plain jsdom
     delete Element.prototype.scrollIntoView
+  })
+
+  describe('focus in React StrictMode (as in development)', () => {
+    const renderStrict = () =>
+      renderWithProviders(
+        <StrictMode>
+          <AppRoutes />
+        </StrictMode>,
+      )
+
+    it('returns focus to the Search button after Escape', async () => {
+      setup()
+      renderStrict()
+      await screen.findByRole('heading', { name: 'Dashboard' })
+      const trigger = screen.getByRole('button', { name: /Search/ })
+      await userEvent.click(trigger)
+      await screen.findByRole('combobox')
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      expect(document.activeElement).toBe(trigger)
+    })
+
+    it('returns focus to the element that had it before Ctrl+K', async () => {
+      setup()
+      renderStrict()
+      await screen.findByRole('heading', { name: 'Dashboard' })
+      const link = screen.getByRole('link', { name: 'Customers' })
+      link.focus()
+      await userEvent.keyboard('{Control>}k{/Control}')
+      await screen.findByRole('combobox')
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      expect(document.activeElement).toBe(link)
+    })
+
+    it('falls back to the Search button when nothing was focused', async () => {
+      setup()
+      renderStrict()
+      await screen.findByRole('heading', { name: 'Dashboard' })
+      await userEvent.keyboard('{Control>}k{/Control}')
+      await screen.findByRole('combobox')
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /Search/ }))
+    })
+
+    it('does not pull focus back after a result is chosen', async () => {
+      setup()
+      renderStrict()
+      await screen.findByRole('heading', { name: 'Dashboard' })
+      const trigger = screen.getByRole('button', { name: /Search/ })
+      await userEvent.click(trigger)
+      await userEvent.type(await screen.findByRole('combobox'), 'ravi')
+      await screen.findAllByRole('option')
+      await userEvent.keyboard('{Enter}')
+      await screen.findByRole('heading', { name: 'Customer' })
+      expect(document.activeElement).not.toBe(trigger)
+    })
   })
 })
