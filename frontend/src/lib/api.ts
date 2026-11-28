@@ -6,6 +6,8 @@ export const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in aga
 export const PASSWORD_CHANGE_DETAIL = 'You must change your password first.'
 export const NETWORK_MESSAGE = "Can't reach the server. Check your connection."
 const FORBIDDEN_MESSAGE = "You don't have access to this."
+export const CSRF_DETAIL = 'Missing or invalid CSRF token.'
+export const CSRF_MESSAGE = 'Your session needs refreshing. Please sign in again.'
 const GENERIC_MESSAGE = 'Something went wrong. Please try again.'
 const CSRF_COOKIE = 'csc_csrf'
 
@@ -38,7 +40,7 @@ export class ApiError extends Error {
 }
 
 interface Handlers {
-  onSessionEnded?: () => void
+  onSessionEnded?: (message: string) => void
   onPasswordChangeRequired?: () => void
 }
 let handlers: Handlers = {}
@@ -59,6 +61,7 @@ type OkOf<O> = O extends { responses: infer R }
       : void
   : never
 type QueryOf<O> = O extends { parameters: { query?: infer Q } } ? Q : never
+type PathParamsOf<O> = O extends { parameters: { path: infer P } } ? P : never
 type BodyOf<O> = O extends { requestBody: { content: { 'application/json': infer B } } } ? B : never
 
 export type GetPath = { [P in keyof paths]: paths[P] extends { get: unknown } ? P : never }[keyof paths]
@@ -67,6 +70,11 @@ export type GetResponse<P extends GetPath> = OkOf<OpOf<P, 'get'>>
 export type GetQuery<P extends GetPath> = QueryOf<OpOf<P, 'get'>>
 export type PostBody<P extends PostPath> = BodyOf<OpOf<P, 'post'>>
 export type PostResponse<P extends PostPath> = OkOf<OpOf<P, 'post'>>
+
+/** Path parameters are required exactly when the contract has them. */
+type OptsArg<O, Extra> = [PathParamsOf<O>] extends [never]
+  ? [opts?: Extra & { params?: undefined }]
+  : [opts: Extra & { params: PathParamsOf<O> }]
 
 interface RequestOptions {
   query?: Record<string, unknown>
@@ -94,9 +102,13 @@ export function readCsrfToken(): string | null {
 }
 
 function buildUrl(path: string, opts: RequestOptions): string {
-  let url = path.replace(/\{(\w+)\}/g, (_m, key: string) =>
-    encodeURIComponent(String(opts.params?.[key] ?? '')),
-  )
+  let url = path.replace(/\{(\w+)\}/g, (_m, key: string) => {
+    const value = opts.params?.[key]
+    if (value === undefined || value === null || value === '') {
+      throw new Error(`Missing path parameter "${key}" for ${path}`)
+    }
+    return encodeURIComponent(String(value))
+  })
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(opts.query ?? {})) {
     if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
@@ -143,11 +155,16 @@ async function toError(res: Response, opts: RequestOptions): Promise<ApiError> {
   const text = typeof detail === 'string' && detail.trim() ? detail : undefined
   const { status } = res
 
+  // A proxy with nothing behind it answers 502/503/504 without our JSON body.
+  if ((status === 502 || status === 503 || status === 504) && detail === undefined) {
+    return new ApiError('network', status, NETWORK_MESSAGE)
+  }
   if (status === 401) {
     if (opts.public) return new ApiError('http', 401, text ?? 'Sign in failed.')
     return new ApiError('session_ended', 401, SESSION_ENDED_MESSAGE)
   }
   if (status === 403) {
+    if (text === CSRF_DETAIL) return new ApiError('session_ended', 403, CSRF_MESSAGE)
     if (text === PASSWORD_CHANGE_DETAIL) return new ApiError('password_change_required', 403, text)
     return new ApiError('forbidden', 403, FORBIDDEN_MESSAGE)
   }
@@ -169,9 +186,10 @@ async function request(method: string, path: string, opts: RequestOptions = {}):
     if (csrf) headers['X-CSRF-Token'] = csrf
   }
 
+  const url = buildUrl(path, opts) // throws on a missing path parameter, before any request
   let res: Response
   try {
-    res = await fetch(buildUrl(path, opts), {
+    res = await fetch(url, {
       method,
       headers,
       credentials: 'include',
@@ -185,8 +203,10 @@ async function request(method: string, path: string, opts: RequestOptions = {}):
 
   if (!res.ok) {
     const error = await toError(res, opts)
-    if (error.kind === 'session_ended') handlers.onSessionEnded?.()
-    if (error.kind === 'password_change_required') handlers.onPasswordChangeRequired?.()
+    if (!opts.public) {
+      if (error.kind === 'session_ended') handlers.onSessionEnded?.(error.message)
+      if (error.kind === 'password_change_required') handlers.onPasswordChangeRequired?.()
+    }
     throw error
   }
   if (res.status === 204) return undefined
@@ -200,14 +220,14 @@ async function request(method: string, path: string, opts: RequestOptions = {}):
 export const api = {
   get<P extends GetPath>(
     path: P,
-    opts: Omit<RequestOptions, 'body' | 'query'> & { query?: GetQuery<P> } = {},
+    ...args: OptsArg<OpOf<P, 'get'>, Omit<RequestOptions, 'body' | 'query' | 'params'> & { query?: GetQuery<P> }>
   ): Promise<GetResponse<P>> {
-    return request('GET', path, opts as RequestOptions) as Promise<GetResponse<P>>
+    return request('GET', path, (args[0] ?? {}) as RequestOptions) as Promise<GetResponse<P>>
   },
   post<P extends PostPath>(
     path: P,
-    opts: Omit<RequestOptions, 'body'> & { body?: PostBody<P> } = {},
+    ...args: OptsArg<OpOf<P, 'post'>, Omit<RequestOptions, 'body' | 'params'> & { body?: PostBody<P> }>
   ): Promise<PostResponse<P>> {
-    return request('POST', path, opts as RequestOptions) as Promise<PostResponse<P>>
+    return request('POST', path, (args[0] ?? {}) as RequestOptions) as Promise<PostResponse<P>>
   },
 }

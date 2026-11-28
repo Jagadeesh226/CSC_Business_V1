@@ -111,4 +111,50 @@ describe('api client', () => {
     const err = (await api.get('/api/v1/dashboard').catch((e: unknown) => e)) as ApiError
     expect(err.message).not.toContain('<')
   })
+
+  it('maps the CSRF 403 to a refresh-your-session message and ends the session', async () => {
+    const onSessionEnded = vi.fn()
+    setApiHandlers({ onSessionEnded })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(403, { detail: 'Missing or invalid CSRF token.' })))
+    const err = (await api.post('/api/v1/auth/logout').catch((e: unknown) => e)) as ApiError
+    expect(err.kind).toBe('session_ended')
+    expect(err.message).toBe('Your session needs refreshing. Please sign in again.')
+    expect(onSessionEnded).toHaveBeenCalledWith('Your session needs refreshing. Please sign in again.')
+  })
+
+  it.each([502, 503, 504])('%i with a non-JSON body is reported as unreachable', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>Bad gateway</html>', { status })))
+    const err = (await api.get('/api/v1/dashboard').catch((e: unknown) => e)) as ApiError
+    expect(err.kind).toBe('network')
+    expect(err.message).toBe("Can't reach the server. Check your connection.")
+  })
+
+  it("keeps the backend's own JSON 503 message", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(503, { detail: 'Document storage is not configured.' })))
+    const err = (await api.get('/api/v1/dashboard').catch((e: unknown) => e)) as ApiError
+    expect(err.message).toBe('Document storage is not configured.')
+  })
+
+  it('fills path parameters and escapes them', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, {}))
+    vi.stubGlobal('fetch', fetchMock)
+    await api.get('/api/v1/customers/{customer_id}', { params: { customer_id: 12 } })
+    expect(lastCall(fetchMock).url).toBe('/api/v1/customers/12')
+  })
+
+  it('throws a clear error when a path parameter is missing', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    // @ts-expect-error the contract requires customer_id, so the types reject this call
+    const result = api.get('/api/v1/customers/{customer_id}')
+    await expect(result).rejects.toThrow('Missing path parameter "customer_id"')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rethrows an aborted request as is, not as a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError')))
+    const err = await api.get('/api/v1/dashboard').catch((e: unknown) => e)
+    expect(err).not.toBeInstanceOf(ApiError)
+    expect((err as DOMException).name).toBe('AbortError')
+  })
 })

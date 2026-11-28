@@ -1,9 +1,9 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { safeReturnPath, useLogin, useMe } from '../auth/useAuth'
+import { safeReturnPath, signOutRequest, useLogin, useMe, type LoginState, type User } from '../auth/useAuth'
 import { ApiError } from '../lib/api'
 import { CENTRE_NAME } from '../config'
 
@@ -13,9 +13,10 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
-interface LoginState {
-  message?: string
-  from?: string
+/** Another person signing in does not inherit the previous user's page. */
+function returnPathFor(state: LoginState, user: User): string {
+  if (state.endedUserId !== undefined && state.endedUserId !== user.id) return '/'
+  return safeReturnPath(state.from)
 }
 
 export function LoginPage() {
@@ -31,12 +32,27 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
-  if (me.data) return <Navigate to={safeReturnPath(state.from)} replace />
+  const [signOutFailed, setSignOutFailed] = useState(state.signOutFailed === true)
+  const [retrying, setRetrying] = useState(false)
+
+  if (me.data) return <Navigate to={returnPathFor(state, me.data)} replace />
+
+  const retrySignOut = async () => {
+    setRetrying(true)
+    try {
+      await signOutRequest()
+      setSignOutFailed(false)
+    } catch {
+      // Stay on the warning so the person can try again.
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   const onSubmit = async (values: FormValues) => {
     try {
-      await login.mutateAsync(values)
-      navigate(safeReturnPath(state.from), { replace: true })
+      const result = await login.mutateAsync(values)
+      navigate(returnPathFor(state, result.user), { replace: true })
     } catch {
       // The message is shown from login.error below.
     }
@@ -50,6 +66,17 @@ export function LoginPage() {
         {state.message && (
           <div role="status" className="notice notice-warning">
             {state.message}
+          </div>
+        )}
+        {signOutFailed && (
+          <div role="alert" className="notice notice-warning">
+            <p style={{ margin: 0 }}>
+              Sign-out did not reach the server, so your session may still be open. Try again, or
+              close the browser before leaving this computer.
+            </p>
+            <button type="button" className="btn" onClick={() => void retrySignOut()} disabled={retrying} style={{ marginTop: 8 }}>
+              {retrying ? 'Signing out...' : 'Try signing out again'}
+            </button>
           </div>
         )}
         {login.error && (

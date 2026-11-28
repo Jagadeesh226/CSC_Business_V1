@@ -93,6 +93,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const fetching = customers.isFetching || jobs.isFetching || vehicles.isFetching
   const error = customers.error ?? jobs.error ?? vehicles.error
 
+  const activeId = items[activeIndex] ? `${listId}-${items[activeIndex].id}` : undefined
+  useEffect(() => {
+    if (activeId) document.getElementById(activeId)?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeId])
+
   const choose = (item: Item) => {
     onClose()
     navigate(item.to)
@@ -138,7 +143,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           aria-label="Search customers, jobs and vehicles"
           aria-expanded={items.length > 0}
           aria-controls={listId}
-          aria-activedescendant={items[activeIndex] ? `${listId}-${items[activeIndex].id}` : undefined}
+          aria-activedescendant={activeId}
           aria-autocomplete="list"
           autoComplete="off"
           placeholder="Search customers, jobs, vehicles..."

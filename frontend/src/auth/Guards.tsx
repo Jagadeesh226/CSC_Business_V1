@@ -1,24 +1,32 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ME_KEY, useMe } from './useAuth'
-import { SESSION_ENDED_MESSAGE, setApiHandlers } from '../lib/api'
+import { ME_KEY, useMe, type LoginState, type User } from './useAuth'
+import { setApiHandlers } from '../lib/api'
 import { ErrorNotice, Loading } from '../components/Status'
 
 /** Wires API-level events (401, "change your password") to navigation. */
 export function ApiEvents() {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
+  const here = useRef(location)
+  useEffect(() => {
+    here.current = location
+  })
   useEffect(() => {
     setApiHandlers({
-      onSessionEnded: () => {
-        const { pathname, search } = window.location
+      onSessionEnded: (message) => {
+        const { pathname, search } = here.current
+        const ended = qc.getQueryData<User | null>(ME_KEY)
+        // Several requests can fail together: only the first one ends the session.
+        if (!ended) return
+        const endedUserId = ended.id
+        qc.clear()
         qc.setQueryData(ME_KEY, null)
         if (pathname === '/login') return
-        navigate('/login', {
-          replace: true,
-          state: { message: SESSION_ENDED_MESSAGE, from: pathname + search },
-        })
+        const state: LoginState = { message, from: pathname + search, endedUserId }
+        navigate('/login', { replace: true, state })
       },
       onPasswordChangeRequired: () => {
         void qc.invalidateQueries({ queryKey: ME_KEY })

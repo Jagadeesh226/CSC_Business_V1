@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { adminUser, emptyDashboard, emptyQueue, employeeUser, jsonResponse, renderApp, stubFetch } from '../test/utils'
 
@@ -14,6 +14,24 @@ describe('forced password change', () => {
     expect(await screen.findByRole('heading', { name: 'Change password' })).toBeTruthy()
     expect(screen.getByText(/must choose a new password/)).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
+  })
+
+  it('puts a server validation message under the right field', async () => {
+    stubFetch({
+      'GET /api/v1/auth/me': forced,
+      'POST /api/v1/auth/change-password': jsonResponse(422, {
+        detail: [{ loc: ['body', 'new_password'], msg: 'Password is too common', type: 'value_error' }],
+      }),
+    })
+    renderApp('/change-password')
+    await userEvent.type(await screen.findByLabelText('Current password'), 'temp-password-1')
+    await userEvent.type(screen.getByLabelText('New password'), 'a-much-longer-one')
+    await userEvent.type(screen.getByLabelText('Type the new password again'), 'a-much-longer-one')
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
+    const field = screen.getByLabelText('New password')
+    await waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'))
+    const errorId = field.getAttribute('aria-describedby') as string
+    expect(document.getElementById(errorId)?.textContent).toBe('Password is too common')
   })
 
   it('validates and submits the new password, then opens the dashboard', async () => {

@@ -44,11 +44,12 @@ export const employeeUser = { ...adminUser, id: 2, name: 'Ravi Employee', email:
 export function renderWithProviders(ui: ReactElement, path = '/') {
   setApiHandlers({})
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...result, client }
 }
 
 export function renderApp(path = '/') {

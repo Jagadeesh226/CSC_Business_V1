@@ -74,4 +74,45 @@ describe('command palette', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(document.activeElement).toBe(trigger)
   })
+
+  it('waits for a pause in typing before searching', async () => {
+    const fetchMock = setup()
+    renderApp('/')
+    await screen.findByRole('heading', { name: 'Dashboard' })
+    await userEvent.keyboard('{Control>}k{/Control}')
+    await userEvent.type(await screen.findByRole('combobox'), 'ra')
+    await new Promise((r) => setTimeout(r, 100))
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('search='))).toBe(false)
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('search=ra'))).toBe(true))
+  })
+
+  it('closes when the backdrop is clicked, but not when the panel is', async () => {
+    setup()
+    renderApp('/')
+    await screen.findByRole('heading', { name: 'Dashboard' })
+    await userEvent.keyboard('{Control>}k{/Control}')
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(dialog)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    await userEvent.click(dialog.parentElement as HTMLElement)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('scrolls the active option into view and makes the page behind inert', async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    setup()
+    const { container } = renderApp('/')
+    await screen.findByRole('heading', { name: 'Dashboard' })
+    expect(container.querySelector('.shell')?.hasAttribute('inert')).toBe(false)
+    await userEvent.keyboard('{Control>}k{/Control}')
+    await userEvent.type(await screen.findByRole('combobox'), 'ravi')
+    await screen.findAllByRole('option')
+    expect(container.querySelector('.shell')?.hasAttribute('inert')).toBe(true)
+    scroll.mockClear()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' })
+    // @ts-expect-error remove the stub again so other tests see plain jsdom
+    delete Element.prototype.scrollIntoView
+  })
 })

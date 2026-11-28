@@ -21,6 +21,7 @@ export function AppShell() {
     setMenuOpenAt((typeof open === 'function' ? open(menuOpen) : open) ? location.pathname : null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -39,7 +40,10 @@ export function AppShell() {
       if (!menuRef.current?.contains(e.target as Node)) setMenuOpenAt(null)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpenAt(null)
+      if (e.key === 'Escape') {
+        setMenuOpenAt(null)
+        toggleRef.current?.focus()
+      }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -69,7 +73,8 @@ export function AppShell() {
   )
 
   return (
-    <div className="shell">
+    <>
+    <div className="shell" inert={paletteOpen}>
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
@@ -85,21 +90,26 @@ export function AppShell() {
         </button>
         <span className="centre-name">{CENTRE_NAME}</span>
         <button type="button" className="btn" onClick={() => setPaletteOpen(true)}>
-          Search <span className="visually-hidden">customers, jobs and vehicles. Shortcut</span>
-          <small aria-hidden="true">{isMac ? '⌘K' : 'Ctrl+K'}</small>
+          Search<span className="visually-hidden"> customers, jobs and vehicles</span>
+          <small className="shortcut-hint" aria-hidden="true">{isMac ? '⌘K' : 'Ctrl+K'}</small>
         </button>
         <div className="user-menu" ref={menuRef}>
           <button
             type="button"
             className="btn"
             aria-expanded={menuOpen}
-            aria-haspopup="true"
+            aria-controls="user-menu"
+            ref={toggleRef}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            {user.name} ({roleLabel})
+            <span className="user-label">{user.name}</span>
+            <span className="role-label"> ({roleLabel})</span>
           </button>
           {menuOpen && (
-            <div className="menu-list">
+            <div className="menu-list" id="user-menu">
+              <p className="hint" style={{ margin: '0 8px' }}>
+                Signed in as {user.name} ({roleLabel})
+              </p>
               <Link className="btn" to="/change-password">
                 Change password
               </Link>
@@ -124,7 +134,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
+    {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+    </>
   )
 }
