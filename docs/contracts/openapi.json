@@ -122,6 +122,107 @@
         "title": "AssignmentRead",
         "type": "object"
       },
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssigneeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "entity_type",
+          "entity_id",
+          "user",
+          "details",
+          "created_at"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
+      "AuditLogPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "AuditLogPage",
+        "type": "object"
+      },
       "BackgroundStatus": {
         "properties": {
           "checked_at": {
@@ -1169,6 +1270,71 @@
         "title": "DailyJobStatus",
         "type": "object"
       },
+      "DashboardScope": {
+        "enum": [
+          "all",
+          "mine"
+        ],
+        "title": "DashboardScope",
+        "type": "string"
+      },
+      "DashboardSummary": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/JobCounts"
+          },
+          "recent_jobs": {
+            "items": {
+              "$ref": "#/components/schemas/RecentJob"
+            },
+            "title": "Recent Jobs",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/DashboardScope"
+          },
+          "unassigned_open_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unassigned Open Jobs"
+          },
+          "workload": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EmployeeWorkload"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workload"
+          }
+        },
+        "required": [
+          "as_of",
+          "scope",
+          "jobs",
+          "workload",
+          "unassigned_open_jobs",
+          "recent_jobs"
+        ],
+        "title": "DashboardSummary",
+        "type": "object"
+      },
       "DismissRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1947,6 +2113,34 @@
         ],
         "title": "DueFilter",
         "type": "string"
+      },
+      "EmployeeWorkload": {
+        "description": "Every active person (admins too) and the jobs they are on now. A job\ncompleted by two people counts for each of them, so these totals can\nadd up to more than the centre's completed count.",
+        "properties": {
+          "completed_this_month": {
+            "title": "Completed This Month",
+            "type": "integer"
+          },
+          "open_jobs": {
+            "title": "Open Jobs",
+            "type": "integer"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "integer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AssigneeRef"
+          }
+        },
+        "required": [
+          "user",
+          "open_jobs",
+          "overdue",
+          "completed_this_month"
+        ],
+        "title": "EmployeeWorkload",
+        "type": "object"
       },
       "ErrorResponse": {
         "properties": {
@@ -2890,6 +3084,53 @@
         "title": "IntakeVehicleRef",
         "type": "object"
       },
+      "JobCounts": {
+        "properties": {
+          "cancelled_this_month": {
+            "title": "Cancelled This Month",
+            "type": "integer"
+          },
+          "completed_this_month": {
+            "title": "Completed This Month",
+            "type": "integer"
+          },
+          "completed_today": {
+            "title": "Completed Today",
+            "type": "integer"
+          },
+          "created_this_month": {
+            "title": "Created This Month",
+            "type": "integer"
+          },
+          "created_today": {
+            "title": "Created Today",
+            "type": "integer"
+          },
+          "due_today": {
+            "title": "Due Today",
+            "type": "integer"
+          },
+          "open": {
+            "$ref": "#/components/schemas/OpenJobCounts"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created_today",
+          "created_this_month",
+          "open",
+          "overdue",
+          "due_today",
+          "completed_today",
+          "completed_this_month",
+          "cancelled_this_month"
+        ],
+        "title": "JobCounts",
+        "type": "object"
+      },
       "JobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -3828,6 +4069,34 @@
         "title": "OcrStatus",
         "type": "string"
       },
+      "OpenJobCounts": {
+        "properties": {
+          "in_progress": {
+            "title": "In Progress",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "integer"
+          },
+          "waiting_for_documents": {
+            "title": "Waiting For Documents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending",
+          "in_progress",
+          "waiting_for_documents",
+          "submitted"
+        ],
+        "title": "OpenJobCounts",
+        "type": "object"
+      },
       "PasswordReset": {
         "additionalProperties": false,
         "properties": {
@@ -4691,6 +4960,44 @@
         ],
         "title": "ReceiptStatus",
         "type": "string"
+      },
+      "RecentJob": {
+        "properties": {
+          "customer_name": {
+            "title": "Customer Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "job_number": {
+            "title": "Job Number",
+            "type": "string"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "job_number",
+          "title",
+          "status",
+          "customer_name",
+          "last_activity_at"
+        ],
+        "title": "RecentJob",
+        "type": "object"
       },
       "RejectRequest": {
         "additionalProperties": false,
@@ -6943,6 +7250,201 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/audit-logs": {
+      "get": {
+        "description": "Admins: review security-relevant activity, newest first.",
+        "operationId": "audit_logs_api_v1_audit_logs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "maximum": 2147483647,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "description": "On or after (centre's calendar)",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "On or after (centre's calendar)",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "On or before (centre's calendar)",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "On or before (centre's calendar)",
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/HTTPValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Validation error, or a business rule (e.g. the job is closed)"
+          }
+        },
+        "summary": "Audit Logs",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
     "/api/v1/auth/change-password": {
       "post": {
         "operationId": "change_password_api_v1_auth_change_password_post",
@@ -7651,6 +8153,48 @@
         "summary": "Upload Document",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "description": "Job counts for the dashboard: an employee's own jobs, or (admins)\nevery job with each person's workload. Dates are the centre's\ncalendar.",
+        "operationId": "dashboard_api_v1_dashboard_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not signed in or session expired"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not allowed, or CSRF missing"
+          }
+        },
+        "summary": "Dashboard",
+        "tags": [
+          "dashboard"
         ]
       }
     },
