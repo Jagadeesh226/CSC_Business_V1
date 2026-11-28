@@ -34,6 +34,10 @@ class JobCounts(BaseModel):
 
 
 class EmployeeWorkload(BaseModel):
+    """Every active person (admins too) and the jobs they are on now. A job
+    completed by two people counts for each of them, so these totals can
+    add up to more than the centre's completed count."""
+
     user: AssigneeRef
     open_jobs: int
     overdue: int

@@ -1,7 +1,8 @@
 """Counts for the dashboard (Phase 6.0). Dates are the centre's calendar
 (India); ``visible_to`` limits everything to an employee's jobs."""
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, and_, func, select
 from sqlalchemy.orm import Session
@@ -14,6 +15,11 @@ from app.schemas.job import FINAL_STATUSES
 
 def _local_date(column) -> ColumnElement:
     return func.date(func.timezone(BUSINESS_TIMEZONE, column))
+
+
+def _start(day: date) -> datetime:
+    """The first moment of a day on the centre's calendar."""
+    return datetime.combine(day, time.min, ZoneInfo(BUSINESS_TIMEZONE))
 
 
 def _scope(visible_to: int | None) -> list[ColumnElement[bool]]:
@@ -42,28 +48,28 @@ def job_counts(db: Session, today: date, visible_to: int | None) -> dict[str, in
         .select_from(Job)
         .where(*_scope(visible_to))
     ).one()
-    changed = _local_date(JobStatusHistory.changed_at)
+    changed = JobStatusHistory.changed_at
+    today_start, tomorrow = _start(today), _start(today + timedelta(days=1))
+    month_from = _start(month_start)
     closed = db.execute(
         select(
             count(
-                and_(JobStatusHistory.new_status == "completed", changed == today)
-            ).label("completed_today"),
-            count(
                 and_(
                     JobStatusHistory.new_status == "completed",
-                    changed >= month_start,
+                    changed >= today_start,
+                    changed < tomorrow,
                 )
+            ).label("completed_today"),
+            count(
+                and_(JobStatusHistory.new_status == "completed", changed >= month_from)
             ).label("completed_this_month"),
             count(
-                and_(
-                    JobStatusHistory.new_status == "cancelled",
-                    changed >= month_start,
-                )
+                and_(JobStatusHistory.new_status == "cancelled", changed >= month_from)
             ).label("cancelled_this_month"),
         )
         .select_from(JobStatusHistory)
         .join(Job, Job.id == JobStatusHistory.job_id)
-        .where(changed >= month_start, *_scope(visible_to))
+        .where(changed >= month_from, *_scope(visible_to))
     ).one()
     return {**row._asdict(), **closed._asdict()}
 
@@ -80,7 +86,7 @@ def workload(db: Session, today: date) -> list[tuple]:
             JobAssignment.user_id == User.id,
             JobAssignment.unassigned_at.is_(None),
             JobStatusHistory.new_status == "completed",
-            _local_date(JobStatusHistory.changed_at) >= month_start,
+            JobStatusHistory.changed_at >= _start(month_start),
         )
         .scalar_subquery()
     )

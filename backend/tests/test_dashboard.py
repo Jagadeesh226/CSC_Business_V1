@@ -330,3 +330,78 @@ def test_someone_taken_off_a_job_no_longer_carries_it(
         workload[employee_user.id]["overdue"],
     ) == (0, 0)
     assert get(client)["unassigned_open_jobs"] == 1
+
+
+# ---------- review fixes ----------
+
+
+def test_an_employee_sees_only_her_completions_and_cancellations(
+    employee_client, employee_user, make_user, make_customer, db_session
+):
+    """Review F1: closed-job counts follow her jobs too."""
+    customer = make_customer()
+    other = make_user("employee")
+    mine = job(db_session, customer, status="submitted", assignees=[employee_user])
+    changed(db_session, mine, "completed")
+    theirs = job(db_session, customer, status="submitted", assignees=[other])
+    changed(db_session, theirs, "completed")
+    dropped = job(db_session, customer, assignees=[other])
+    changed(db_session, dropped, "cancelled")
+    jobs = get(employee_client)["jobs"]
+    assert (jobs["completed_today"], jobs["completed_this_month"]) == (1, 1)
+    assert jobs["cancelled_this_month"] == 0
+
+
+def test_workload_and_unassigned_count_open_jobs_only(
+    client, make_user, make_customer, db_session, today
+):
+    """Review F2."""
+    customer = make_customer()
+    sam = make_user("employee", name="Sam Desk")
+    alex = make_user("employee", name="Alex Desk")
+    job(db_session, customer, status="completed")  # unassigned but closed
+    job(
+        db_session,
+        customer,
+        status="completed",
+        assignees=[sam],
+        due=today - timedelta(days=5),
+    )
+    # Alex was on it, then Sam took over and completed it.
+    handed = job(db_session, customer, status="submitted", assignees=[alex])
+    db_session.execute(
+        text("UPDATE job_assignments SET unassigned_at = now() WHERE job_id = :j"),
+        {"j": handed.id},
+    )
+    db_session.add(JobAssignment(job_id=handed.id, user_id=sam.id, assigned_by=sam.id))
+    db_session.flush()
+    changed(db_session, handed, "completed")
+    body = get(client)
+    assert body["unassigned_open_jobs"] == 0
+    workload = {w["user"]["name"]: w for w in body["workload"]}
+    assert (workload["Sam Desk"]["overdue"], workload["Sam Desk"]["open_jobs"]) == (
+        0,
+        0,
+    )
+    assert workload["Sam Desk"]["completed_this_month"] == 1
+    assert workload["Alex Desk"]["completed_this_month"] == 0
+
+
+def test_a_whole_year_is_allowed_but_not_more(client, today):
+    """Review F6: at most 366 days, counted inclusively."""
+    start = today - timedelta(days=365)
+    assert (
+        client.get(
+            AUDIT,
+            params={"date_from": start.isoformat(), "date_to": today.isoformat()},
+        ).status_code
+        == 200
+    )
+    too_long = client.get(
+        AUDIT,
+        params={
+            "date_from": (start - timedelta(days=1)).isoformat(),
+            "date_to": today.isoformat(),
+        },
+    )
+    assert too_long.status_code == 422

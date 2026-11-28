@@ -121,7 +121,8 @@ def audit_log(
     if date_from and date_to:
         if date_from > date_to:
             raise BusinessRuleError("The start date is after the end date.")
-        if (date_to - date_from).days > MAX_AUDIT_RANGE_DAYS:
+        # Inclusive: from 1 Jan to 31 Dec of a leap year is 366 days.
+        if (date_to - date_from).days + 1 > MAX_AUDIT_RANGE_DAYS:
             raise BusinessRuleError("Choose at most one year at a time.")
     conditions = []
     if action:
