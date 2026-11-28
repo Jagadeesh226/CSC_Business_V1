@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     auth,
     catalogue,
     customers,
+    dashboard,
     documents,
     exports,
     fees,
@@ -30,6 +31,7 @@ api_router.include_router(catalogue.router)
 api_router.include_router(documents.router)
 api_router.include_router(tasks.router)
 api_router.include_router(queues.router)
+api_router.include_router(dashboard.router)
 api_router.include_router(payments.router)
 api_router.include_router(receipts.router)
 api_router.include_router(reports.router)

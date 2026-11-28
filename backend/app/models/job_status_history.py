@@ -23,6 +23,7 @@ class JobStatusHistory(Base):
     new_status: Mapped[str] = mapped_column(String(50), nullable=False)
     changed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     reason: Mapped[str | None] = mapped_column(Text)
+    # Indexed: the dashboard counts this month's completions.
     changed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
