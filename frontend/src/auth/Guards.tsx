@@ -1,0 +1,73 @@
+import { useEffect } from 'react'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { ME_KEY, useMe } from './useAuth'
+import { SESSION_ENDED_MESSAGE, setApiHandlers } from '../lib/api'
+import { ErrorNotice, Loading } from '../components/Status'
+
+/** Wires API-level events (401, "change your password") to navigation. */
+export function ApiEvents() {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  useEffect(() => {
+    setApiHandlers({
+      onSessionEnded: () => {
+        const { pathname, search } = window.location
+        qc.setQueryData(ME_KEY, null)
+        if (pathname === '/login') return
+        navigate('/login', {
+          replace: true,
+          state: { message: SESSION_ENDED_MESSAGE, from: pathname + search },
+        })
+      },
+      onPasswordChangeRequired: () => {
+        void qc.invalidateQueries({ queryKey: ME_KEY })
+        navigate('/change-password', { replace: true })
+      },
+    })
+    return () => setApiHandlers({})
+  }, [qc, navigate])
+  return null
+}
+
+/** Signed-out users go to /login; users who must change their password go to /change-password. */
+export function RequireAuth({ allowForcedChange = false }: { allowForcedChange?: boolean }) {
+  const me = useMe()
+  const location = useLocation()
+
+  if (me.isPending) return <Loading label="Checking your sign-in..." />
+  if (me.isError) {
+    return (
+      <div className="centered-page">
+        <ErrorNotice error={me.error} onRetry={() => void me.refetch()} />
+      </div>
+    )
+  }
+  if (!me.data) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    )
+  }
+  if (me.data.must_change_password && !allowForcedChange) {
+    return <Navigate to="/change-password" replace />
+  }
+  return <Outlet />
+}
+
+/** Employees see a clear message; the backend still enforces access. */
+export function RequireAdmin() {
+  const me = useMe()
+  if (me.data?.role !== 'admin') {
+    return (
+      <div>
+        <h1>Admins only</h1>
+        <p>This page is only for administrators. If you need access, please ask your admin.</p>
+      </div>
+    )
+  }
+  return <Outlet />
+}
