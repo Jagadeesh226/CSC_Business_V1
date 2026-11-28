@@ -405,3 +405,22 @@ def test_a_whole_year_is_allowed_but_not_more(client, today):
         },
     )
     assert too_long.status_code == 422
+
+
+def test_a_cancellation_shows_its_reason_in_the_audit_log(
+    client, make_customer, db_session
+):
+    customer = make_customer()
+    row = job(db_session, customer)
+    cancelled = client.post(
+        f"/api/v1/jobs/{row.id}/cancel", json={"reason": "Customer withdrew"}
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    [entry_] = get(
+        client, AUDIT, entity_type="job", entity_id=row.id, action="job_cancelled"
+    )["items"]
+    assert entry_["details"] == {
+        "from": "pending",
+        "to": "cancelled",
+        "reason": "Customer withdrew",
+    }
