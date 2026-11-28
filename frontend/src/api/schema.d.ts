@@ -4,6 +4,472 @@
  */
 
 export interface paths {
+    "/api/v1/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Logs
+         * @description Admins: review security-relevant activity, newest first.
+         */
+        get: operations["audit_logs_api_v1_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_api_v1_auth_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Customers */
+        get: operations["list_customers_api_v1_customers_get"];
+        put?: never;
+        /** Create Customer */
+        post: operations["create_customer_api_v1_customers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer */
+        get: operations["get_customer_api_v1_customers__customer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Customer */
+        patch: operations["update_customer_api_v1_customers__customer_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents */
+        get: operations["list_documents_api_v1_customers__customer_id__documents_get"];
+        put?: never;
+        /** Upload Document */
+        post: operations["upload_document_api_v1_customers__customer_id__documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard
+         * @description Job counts for the dashboard: an employee's own jobs, or (admins)
+         *     every job with each person's workload. Dates are the centre's
+         *     calendar.
+         */
+        get: operations["dashboard_api_v1_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Document Types */
+        get: operations["list_document_types_api_v1_document_types_get"];
+        put?: never;
+        /** Create Document Type */
+        post: operations["create_document_type_api_v1_document_types_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-types/{type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Document Type */
+        patch: operations["update_document_type_api_v1_document_types__type_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: operations["get_document_api_v1_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive */
+        post: operations["archive_api_v1_documents__document_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download */
+        get: operations["download_api_v1_documents__document_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/ocr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr */
+        get: operations["get_ocr_api_v1_documents__document_id__ocr_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/ocr/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Ocr */
+        post: operations["retry_ocr_api_v1_documents__document_id__ocr_retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/ocr/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Ocr */
+        post: operations["review_ocr_api_v1_documents__document_id__ocr_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview */
+        get: operations["preview_api_v1_documents__document_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_v1_documents__document_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/vehicle-intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Intake */
+        get: operations["get_intake_api_v1_documents__document_id__vehicle_intake_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/vehicle-intake/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Intake */
+        post: operations["resolve_intake_api_v1_documents__document_id__vehicle_intake_resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify */
+        post: operations["verify_api_v1_documents__document_id__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Version */
+        post: operations["add_version_api_v1_documents__document_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Exports
+         * @description Your exports, newest first.
+         */
+        get: operations["list_exports_api_v1_exports_get"];
+        put?: never;
+        /**
+         * Request Export
+         * @description Ask for a vehicles or jobs spreadsheet. It is built in the background
+         *     with what you may see; you are notified when it is ready, and can
+         *     download it for 24 hours. Audited.
+         */
+        post: operations["request_export_api_v1_exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export */
+        get: operations["get_export_api_v1_exports__export_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/{export_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Export
+         * @description Download your finished export. Audited.
+         */
+        get: operations["download_export_api_v1_exports__export_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -13,6 +479,915 @@ export interface paths {
         };
         /** Api Health */
         get: operations["api_health_api_v1_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Api Ready
+         * @description For load balancers and monitors; needs no sign-in and says only
+         *     whether the database and Redis answer.
+         */
+        get: operations["api_ready_api_v1_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jobs */
+        get: operations["list_jobs_api_v1_jobs_get"];
+        put?: never;
+        /** Create Job */
+        post: operations["create_job_api_v1_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_v1_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Job */
+        patch: operations["update_job_api_v1_jobs__job_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Assignments */
+        get: operations["list_assignments_api_v1_jobs__job_id__assignments_get"];
+        put?: never;
+        /** Assign User */
+        post: operations["assign_user_api_v1_jobs__job_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/assignments/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unassign User */
+        delete: operations["unassign_user_api_v1_jobs__job_id__assignments__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Job */
+        post: operations["cancel_job_api_v1_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Checklist */
+        get: operations["get_checklist_api_v1_jobs__job_id__checklist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/checklist/{item_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Document */
+        post: operations["link_document_api_v1_jobs__job_id__checklist__item_id__documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/fees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Fees */
+        get: operations["list_fees_api_v1_jobs__job_id__fees_get"];
+        put?: never;
+        /** Add Fee */
+        post: operations["add_fee_api_v1_jobs__job_id__fees_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/fees/{fee_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Fee */
+        delete: operations["remove_fee_api_v1_jobs__job_id__fees__fee_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Fee */
+        patch: operations["update_fee_api_v1_jobs__job_id__fees__fee_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Payments */
+        get: operations["list_payments_api_v1_jobs__job_id__payments_get"];
+        put?: never;
+        /** Record Payment */
+        post: operations["record_payment_api_v1_jobs__job_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Status */
+        post: operations["change_status_api_v1_jobs__job_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}/status-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Status History */
+        get: operations["list_status_history_api_v1_jobs__job_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notifications */
+        get: operations["list_notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark All Read */
+        post: operations["mark_all_read_api_v1_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_v1_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{payment_id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void Payment */
+        post: operations["void_payment_api_v1_payments__payment_id__void_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Receipts */
+        get: operations["search_receipts_api_v1_receipts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts/{receipt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Receipt */
+        get: operations["get_receipt_api_v1_receipts__receipt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/receipts/{receipt_id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Print Receipt
+         * @description Print one copy: the first is the original, every later one says
+         *     DUPLICATE COPY. A POST (CSRF-protected), so reloading a page, a
+         *     prefetch or a link from another site can never use up the original.
+         */
+        post: operations["print_receipt_api_v1_receipts__receipt_id__print_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reminders
+         * @description Soonest first. ``status=open`` gives pending and ready_to_send.
+         */
+        get: operations["list_reminders_api_v1_reminders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reminders/{reminder_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["dismiss_api_v1_reminders__reminder_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reminders/{reminder_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Done
+         * @description Record that the customer was contacted (e.g. the WhatsApp message was
+         *     sent). Opening the WhatsApp link does not do this.
+         */
+        post: operations["mark_done_api_v1_reminders__reminder_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Collections
+         * @description Money received per day, method and person: collections, not profit.
+         */
+        get: operations["collections_api_v1_reports_collections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/vehicles.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vehicles Export
+         * @description Vehicles with their expiry dates and a WhatsApp link per row
+         *     (chassis, engine and mobile masked). Employees get the vehicles they
+         *     may see. Audited.
+         */
+        get: operations["vehicles_export_api_v1_reports_vehicles_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Review Queue */
+        get: operations["review_queue_api_v1_review_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories */
+        get: operations["list_categories_api_v1_service_categories_get"];
+        put?: never;
+        /** Create Category */
+        post: operations["create_category_api_v1_service_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service-categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Category */
+        patch: operations["update_category_api_v1_service_categories__category_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Services */
+        get: operations["list_services_api_v1_services_get"];
+        put?: never;
+        /** Create Service */
+        post: operations["create_service_api_v1_services_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Service */
+        get: operations["get_service_api_v1_services__service_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Service */
+        patch: operations["update_service_api_v1_services__service_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/services/{service_id}/document-requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Requirements */
+        get: operations["list_requirements_api_v1_services__service_id__document_requirements_get"];
+        put?: never;
+        /** Add Requirement */
+        post: operations["add_requirement_api_v1_services__service_id__document_requirements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services/{service_id}/document-requirements/{requirement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Requirement */
+        patch: operations["update_requirement_api_v1_services__service_id__document_requirements__requirement_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_tasks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Background Overview
+         * @description Is background work healthy? Workers, queue counts by task type,
+         *     the daily jobs, and plain-language problems.
+         */
+        get: operations["background_overview_api_v1_tasks_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task */
+        get: operations["get_task_api_v1_tasks__task_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Task */
+        post: operations["retry_task_api_v1_tasks__task_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_v1_users_get"];
+        put?: never;
+        /** Create User */
+        post: operations["create_user_api_v1_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get User */
+        get: operations["get_user_api_v1_users__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update User */
+        patch: operations["update_user_api_v1_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate User */
+        post: operations["deactivate_user_api_v1_users__user_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate User */
+        post: operations["reactivate_user_api_v1_users__user_id__reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Password */
+        post: operations["reset_password_api_v1_users__user_id__reset_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicle-expiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Expiries
+         * @description Current validity dates of active vehicles in buckets: expired, 0-7,
+         *     8-15, 16-30 and over 30 days (centre's calendar).
+         */
+        get: operations["list_expiries_api_v1_vehicle_expiries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicle-lookups/{lookup_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lookup */
+        get: operations["get_lookup_api_v1_vehicle_lookups__lookup_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicle-lookups/{lookup_id}/captcha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Captcha Image */
+        get: operations["captcha_image_api_v1_vehicle_lookups__lookup_id__captcha_get"];
+        put?: never;
+        /**
+         * Answer Captcha
+         * @description The person's answer to the CAPTCHA; the lookup continues.
+         */
+        post: operations["answer_captcha_api_v1_vehicle_lookups__lookup_id__captcha_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vehicles */
+        get: operations["list_vehicles_api_v1_vehicles_get"];
+        put?: never;
+        /** Create Vehicle */
+        post: operations["create_vehicle_api_v1_vehicles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicles/{vehicle_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Vehicle */
+        get: operations["get_vehicle_api_v1_vehicles__vehicle_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Vehicle */
+        patch: operations["update_vehicle_api_v1_vehicles__vehicle_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/vehicles/{vehicle_id}/expiries/{expiry_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Expiry
+         * @description Set (or clear with null) the current date; the old one stays in the
+         *     history.
+         */
+        put: operations["set_expiry_api_v1_vehicles__vehicle_id__expiries__expiry_type__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicles/{vehicle_id}/expiries/{expiry_type}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expiry History */
+        get: operations["expiry_history_api_v1_vehicles__vehicle_id__expiries__expiry_type__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vehicles/{vehicle_id}/lookups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Lookups */
+        get: operations["list_lookups_api_v1_vehicles__vehicle_id__lookups_get"];
+        put?: never;
+        /**
+         * Request Lookup
+         * @description Look up the vehicle's validity dates and pending challans from the
+         *     configured source (in the background).
+         */
+        post: operations["request_lookup_api_v1_vehicles__vehicle_id__lookups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/work-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Work Queue */
+        get: operations["work_queue_api_v1_work_queue_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -41,7 +1416,2299 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /**
+         * ApplyToCustomer
+         * @description Copy one confirmed OCR value onto the customer, explicitly.
+         */
+        ApplyToCustomer: {
+            customer_field: components["schemas"]["CustomerField"];
+            /** Ocr Field */
+            ocr_field: string;
+        };
+        /** ArchiveRequest */
+        ArchiveRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** AssigneeRef */
+        AssigneeRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** AssignmentCreate */
+        AssignmentCreate: {
+            /** User Id */
+            user_id: number;
+        };
+        /** AssignmentRead */
+        AssignmentRead: {
+            /**
+             * Assigned At
+             * Format: date-time
+             */
+            assigned_at: string;
+            assigned_by: components["schemas"]["AssigneeRef"];
+            /** Id */
+            id: number;
+            /** Unassigned At */
+            unassigned_at: string | null;
+            unassigned_by: components["schemas"]["AssigneeRef"] | null;
+            user: components["schemas"]["AssigneeRef"];
+        };
+        /** AuditEntry */
+        AuditEntry: {
+            /** Action */
+            action: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            } | null;
+            /** Entity Id */
+            entity_id: number | null;
+            /** Entity Type */
+            entity_type: string;
+            /** Id */
+            id: number;
+            user: components["schemas"]["AssigneeRef"] | null;
+        };
+        /** AuditLogPage */
+        AuditLogPage: {
+            /** Items */
+            items: components["schemas"]["AuditEntry"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** BackgroundStatus */
+        BackgroundStatus: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Daily Jobs */
+            daily_jobs: components["schemas"]["DailyJobStatus"][];
+            /** Healthy */
+            healthy: boolean;
+            /** Problems */
+            problems: string[];
+            /** Queue */
+            queue: components["schemas"]["TaskTypeCounts"][];
+            /** Warnings */
+            warnings: string[];
+            /** Workers */
+            workers: components["schemas"]["WorkerStatus"][];
+        };
+        /** Body_add_version_api_v1_documents__document_id__versions_post */
+        Body_add_version_api_v1_documents__document_id__versions_post: {
+            /** Change Reason */
+            change_reason: string;
+            /**
+             * File
+             * @description PDF, PNG or JPEG, up to 10 MB
+             */
+            file: string;
+        };
+        /** Body_upload_document_api_v1_customers__customer_id__documents_post */
+        Body_upload_document_api_v1_customers__customer_id__documents_post: {
+            /** Checklist Item Id */
+            checklist_item_id?: number | null;
+            /** Document Type Id */
+            document_type_id?: number | null;
+            /**
+             * File
+             * @description PDF, PNG or JPEG, up to 10 MB
+             */
+            file: string;
+            /** Job Id */
+            job_id?: number | null;
+        };
+        /** CancelRequest */
+        CancelRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** CaptchaAnswer */
+        CaptchaAnswer: {
+            /** Answer */
+            answer: string;
+        };
+        /** CategoryCreate */
+        CategoryCreate: {
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /** CategoryRead */
+        CategoryRead: {
+            /** Code */
+            code: string;
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Sort Order */
+            sort_order: number;
+        };
+        /** CategoryRef */
+        CategoryRef: {
+            /** Code */
+            code: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** CategoryUpdate */
+        CategoryUpdate: {
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /**
+         * ChallanStatus
+         * @enum {string}
+         */
+        ChallanStatus: "unknown" | "none" | "pending";
+        /** ChangePasswordRequest */
+        ChangePasswordRequest: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** ChecklistDocument */
+        ChecklistDocument: {
+            /** Current Version */
+            current_version: number;
+            /** Filename */
+            filename: string;
+            /** Id */
+            id: number;
+            status: components["schemas"]["DocumentStatus"];
+        };
+        /** ChecklistItemRead */
+        ChecklistItemRead: {
+            /** Allow Multiple */
+            allow_multiple: boolean;
+            /** Document Type Code */
+            document_type_code: string;
+            /** Document Type Id */
+            document_type_id: number;
+            /** Document Type Name */
+            document_type_name: string;
+            /** Documents */
+            documents: components["schemas"]["ChecklistDocument"][];
+            /** Id */
+            id: number;
+            /** Is Required */
+            is_required: boolean;
+            sensitivity: components["schemas"]["Sensitivity"];
+            state: components["schemas"]["ChecklistState"];
+        };
+        /** ChecklistResponse */
+        ChecklistResponse: {
+            /** Complete */
+            complete: boolean;
+            /** Items */
+            items: components["schemas"]["ChecklistItemRead"][];
+            /** Required Total */
+            required_total: number;
+            /** Required Verified */
+            required_verified: number;
+        };
+        /**
+         * ChecklistState
+         * @enum {string}
+         */
+        ChecklistState: "missing" | "pending" | "rejected" | "verified";
+        /** CollectionsDay */
+        CollectionsDay: {
+            /** By Method */
+            by_method: components["schemas"]["CollectionsMethodTotal"][];
+            /** Count */
+            count: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Total */
+            total: string;
+        };
+        /** CollectionsMethodTotal */
+        CollectionsMethodTotal: {
+            /** Count */
+            count: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** Total */
+            total: string;
+        };
+        /** CollectionsReceiverTotal */
+        CollectionsReceiverTotal: {
+            /** Count */
+            count: number;
+            received_by: components["schemas"]["AssigneeRef"] | null;
+            /** Total */
+            total: string;
+        };
+        /** CollectionsReport */
+        CollectionsReport: {
+            /** By Day */
+            by_day: components["schemas"]["CollectionsDay"][];
+            /** By Method */
+            by_method: components["schemas"]["CollectionsMethodTotal"][];
+            /** By Receiver */
+            by_receiver: components["schemas"]["CollectionsReceiverTotal"][];
+            /** Count */
+            count: number;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Label
+             * @constant
+             */
+            label: "Collections";
+            /** Note */
+            note: string;
+            /** Total */
+            total: string;
+            voided: components["schemas"]["CollectionsVoided"];
+            voids_in_period: components["schemas"]["CollectionsVoided"];
+        };
+        /** CollectionsVoided */
+        CollectionsVoided: {
+            /** Count */
+            count: number;
+            /** Total */
+            total: string;
+        };
+        /** CustomerCreate */
+        CustomerCreate: {
+            /** Address */
+            address?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** CustomerCreated */
+        CustomerCreated: {
+            customer: components["schemas"]["CustomerRead"];
+            /** Possible Duplicates */
+            possible_duplicates: components["schemas"]["CustomerSummary"][];
+        };
+        /**
+         * CustomerField
+         * @enum {string}
+         */
+        CustomerField: "name" | "phone" | "email" | "address";
+        /** CustomerListResponse */
+        CustomerListResponse: {
+            /** Items */
+            items: components["schemas"]["CustomerSummary"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /**
+         * CustomerRead
+         * @description Full customer details (single-customer views).
+         */
+        CustomerRead: {
+            /** Address */
+            address: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string | null;
+            /** Phone */
+            phone: string | null;
+        };
+        /** CustomerRef */
+        CustomerRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string | null;
+        };
+        /**
+         * CustomerSummary
+         * @description List and search results: the phone number is masked.
+         */
+        CustomerSummary: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Phone Masked */
+            phone_masked: string | null;
+        };
+        /**
+         * CustomerUpdate
+         * @description Partial update. Name cannot be cleared; other fields can be set to null.
+         */
+        CustomerUpdate: {
+            /** Address */
+            address?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** DailyJobStatus */
+        DailyJobStatus: {
+            /** Label */
+            label: string;
+            /** Last Business Date */
+            last_business_date: string | null;
+            /** Last Ran At */
+            last_ran_at: string | null;
+            /** Name */
+            name: string;
+            /** Ran Today */
+            ran_today: boolean;
+        };
+        /**
+         * DashboardScope
+         * @enum {string}
+         */
+        DashboardScope: "all" | "mine";
+        /** DashboardSummary */
+        DashboardSummary: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            jobs: components["schemas"]["JobCounts"];
+            /** Recent Jobs */
+            recent_jobs: components["schemas"]["RecentJob"][];
+            scope: components["schemas"]["DashboardScope"];
+            /** Unassigned Open Jobs */
+            unassigned_open_jobs: number | null;
+            /** Workload */
+            workload: components["schemas"]["EmployeeWorkload"][] | null;
+        };
+        /** DismissRequest */
+        DismissRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** DocumentDetail */
+        DocumentDetail: {
+            /** Archive Reason */
+            archive_reason: string | null;
+            /** Archived At */
+            archived_at: string | null;
+            /** Content Type */
+            content_type: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version */
+            current_version: number;
+            /** Customer Id */
+            customer_id: number;
+            document_type: components["schemas"]["DocumentTypeRef"] | null;
+            /** Filename */
+            filename: string;
+            /** Id */
+            id: number;
+            /** Job Ids */
+            job_ids: number[];
+            /** Page Count */
+            page_count: number | null;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            /** Reusable */
+            reusable: boolean;
+            /** Reuse Block Reason */
+            reuse_block_reason: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["DocumentStatus"];
+            uploaded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Verified At */
+            verified_at: string | null;
+            verified_by: components["schemas"]["AssigneeRef"] | null;
+            /** Versions */
+            versions: components["schemas"]["DocumentVersionRead"][];
+        };
+        /**
+         * DocumentProgress
+         * @description Required checklist documents of the job, by state.
+         */
+        DocumentProgress: {
+            /** Complete */
+            complete: boolean;
+            /** Missing */
+            missing: number;
+            /** Processing */
+            processing: number;
+            /** Rejected */
+            rejected: number;
+            /** Required Total */
+            required_total: number;
+            /** To Review */
+            to_review: number;
+            /** Verified */
+            verified: number;
+        };
+        /** DocumentRead */
+        DocumentRead: {
+            /** Archive Reason */
+            archive_reason: string | null;
+            /** Archived At */
+            archived_at: string | null;
+            /** Content Type */
+            content_type: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Version */
+            current_version: number;
+            /** Customer Id */
+            customer_id: number;
+            document_type: components["schemas"]["DocumentTypeRef"] | null;
+            /** Filename */
+            filename: string;
+            /** Id */
+            id: number;
+            /** Job Ids */
+            job_ids: number[];
+            /** Page Count */
+            page_count: number | null;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            /** Reusable */
+            reusable: boolean;
+            /** Reuse Block Reason */
+            reuse_block_reason: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["DocumentStatus"];
+            uploaded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Verified At */
+            verified_at: string | null;
+            verified_by: components["schemas"]["AssigneeRef"] | null;
+        };
+        /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "uploaded" | "processing" | "needs_review" | "verified" | "rejected";
+        /** DocumentTypeCreate */
+        DocumentTypeCreate: {
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Ocr Fields
+             * @default []
+             */
+            ocr_fields: components["schemas"]["OcrField"][];
+            /** @default normal */
+            sensitivity: components["schemas"]["Sensitivity"];
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            vehicle_role?: components["schemas"]["VehicleRole"] | null;
+        };
+        /** DocumentTypeRead */
+        DocumentTypeRead: {
+            /** Code */
+            code: string;
+            /** Description */
+            description: string | null;
+            /** Id */
+            id: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Ocr Fields */
+            ocr_fields: components["schemas"]["OcrField"][];
+            sensitivity: components["schemas"]["Sensitivity"];
+            /** Sort Order */
+            sort_order: number;
+            vehicle_role?: components["schemas"]["VehicleRole"] | null;
+        };
+        /** DocumentTypeRef */
+        DocumentTypeRef: {
+            /** Code */
+            code: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            sensitivity: components["schemas"]["Sensitivity"];
+        };
+        /** DocumentTypeUpdate */
+        DocumentTypeUpdate: {
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Ocr Fields */
+            ocr_fields?: components["schemas"]["OcrField"][] | null;
+            sensitivity?: components["schemas"]["Sensitivity"] | null;
+            /** Sort Order */
+            sort_order?: number | null;
+            vehicle_role?: components["schemas"]["VehicleRole"] | null;
+        };
+        /** DocumentVersionRead */
+        DocumentVersionRead: {
+            /** Change Reason */
+            change_reason: string | null;
+            /** Content Type */
+            content_type: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Page Count */
+            page_count: number | null;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            uploaded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Version */
+            version: number;
+        };
+        /** DoneRequest */
+        DoneRequest: {
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * DueFilter
+         * @description Open jobs by due date, in the centre's calendar (Asia/Kolkata).
+         * @enum {string}
+         */
+        DueFilter: "overdue" | "today";
+        /**
+         * EmployeeWorkload
+         * @description Every active person (admins too) and the jobs they are on now. A job
+         *     completed by two people counts for each of them, so these totals can
+         *     add up to more than the centre's completed count.
+         */
+        EmployeeWorkload: {
+            /** Completed This Month */
+            completed_this_month: number;
+            /** Open Jobs */
+            open_jobs: number;
+            /** Overdue */
+            overdue: number;
+            user: components["schemas"]["AssigneeRef"];
+        };
+        /** ErrorResponse */
+        ErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * ExpiryBucket
+         * @enum {string}
+         */
+        ExpiryBucket: "expired" | "0_7" | "8_15" | "16_30" | "over_30";
+        /** ExpiryHistoryResponse */
+        ExpiryHistoryResponse: {
+            expiry_type: components["schemas"]["ExpiryType"];
+            /** Items */
+            items: components["schemas"]["ExpiryRead"][];
+        };
+        /** ExpiryListItem */
+        ExpiryListItem: {
+            bucket: components["schemas"]["ExpiryBucket"];
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Days Left */
+            days_left: number;
+            /** Expiry Type */
+            expiry_type: string;
+            /** Registration Number */
+            registration_number: string;
+            /**
+             * Valid Until
+             * Format: date
+             */
+            valid_until: string;
+            /** Vehicle Id */
+            vehicle_id: number;
+            /** Whatsapp Link */
+            whatsapp_link: string | null;
+        };
+        /** ExpiryListResponse */
+        ExpiryListResponse: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Items */
+            items: components["schemas"]["ExpiryListItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** ExpiryRead */
+        ExpiryRead: {
+            /** Days Left */
+            days_left: number | null;
+            expiry_type: components["schemas"]["ExpiryType"];
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            recorded_by: components["schemas"]["AssigneeRef"] | null;
+            source: components["schemas"]["ValueSource"];
+            /** Source Document Id */
+            source_document_id: number | null;
+            /** Valid Until */
+            valid_until: string | null;
+        };
+        /**
+         * ExpirySet
+         * @description Set (or clear, with null) the current date of one expiry type.
+         */
+        ExpirySet: {
+            /** Document Id */
+            document_id?: number | null;
+            /** Valid Until */
+            valid_until: string | null;
+        };
+        /**
+         * ExpiryType
+         * @enum {string}
+         */
+        ExpiryType: "insurance" | "pucc" | "fitness" | "tax" | "permit";
+        /**
+         * ExportKind
+         * @enum {string}
+         */
+        ExportKind: "vehicles" | "jobs";
+        /** ExportListResponse */
+        ExportListResponse: {
+            /** Items */
+            items: components["schemas"]["ExportRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** ExportRead */
+        ExportRead: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Download Count */
+            download_count: number;
+            /** Expires At */
+            expires_at: string | null;
+            /** Failure Reason */
+            failure_reason: string | null;
+            /** File Size */
+            file_size: number | null;
+            /** Filename */
+            filename: string | null;
+            /** Filters */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            kind: components["schemas"]["ExportKind"];
+            /** Last Downloaded At */
+            last_downloaded_at: string | null;
+            /** Row Count */
+            row_count: number | null;
+            status: components["schemas"]["ExportStatus"];
+        };
+        /**
+         * ExportStatus
+         * @enum {string}
+         */
+        ExportStatus: "queued" | "completed" | "failed" | "expired";
+        /** FeeCreate */
+        FeeCreate: {
+            /** Amount */
+            amount: number | string;
+            /** Description */
+            description: string;
+            fee_type: components["schemas"]["FeeType"];
+        };
+        /** FeeListResponse */
+        FeeListResponse: {
+            /** Items */
+            items: components["schemas"]["FeeRead"][];
+            totals: components["schemas"]["FeeTotals"];
+        };
+        /** FeeRead */
+        FeeRead: {
+            /** Amount */
+            amount: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            created_by: components["schemas"]["AssigneeRef"] | null;
+            /** Deleted At */
+            deleted_at: string | null;
+            deleted_by: components["schemas"]["AssigneeRef"] | null;
+            /** Description */
+            description: string;
+            fee_type: components["schemas"]["FeeType"];
+            /** Id */
+            id: number;
+        };
+        /** FeeTotals */
+        FeeTotals: {
+            /** Department */
+            department: string;
+            /** Service */
+            service: string;
+            /** Third Party */
+            third_party: string;
+            /** Total */
+            total: string;
+        };
+        /**
+         * FeeType
+         * @description Matches the ck_job_fees_fee_type database constraint.
+         * @enum {string}
+         */
+        FeeType: "service" | "third_party" | "department";
+        /** FeeUpdate */
+        FeeUpdate: {
+            /** Amount */
+            amount?: number | string | null;
+            /** Description */
+            description?: string | null;
+            fee_type?: components["schemas"]["FeeType"] | null;
+        };
+        /**
+         * FieldFlag
+         * @enum {string}
+         */
+        FieldFlag: "ok" | "low_confidence" | "missing";
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HealthCheckState
+         * @enum {string}
+         */
+        HealthCheckState: "ok" | "unavailable";
+        /** HealthReadiness */
+        HealthReadiness: {
+            database: components["schemas"]["HealthCheckState"];
+            redis: components["schemas"]["HealthCheckState"];
+            status: components["schemas"]["HealthStatus"];
+        };
+        /**
+         * HealthStatus
+         * @enum {string}
+         */
+        HealthStatus: "ok" | "degraded" | "unavailable";
+        /** IntakeCheckField */
+        IntakeCheckField: {
+            /** Key */
+            key: string;
+            /** Read Value */
+            read_value: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * IntakeField
+         * @enum {string}
+         */
+        IntakeField: "registration_number" | "owner_name" | "chassis_number" | "engine_number";
+        /** IntakePendingChange */
+        IntakePendingChange: {
+            /** Current */
+            current: string | null;
+            /** Key */
+            key: string;
+            /** Proposed */
+            proposed: string | null;
+        };
+        /** IntakeRead */
+        IntakeRead: {
+            /** Check Fields */
+            check_fields: components["schemas"]["IntakeCheckField"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Document Id */
+            document_id: number;
+            /** Document Version */
+            document_version: number;
+            /** Pending Changes */
+            pending_changes: components["schemas"]["IntakePendingChange"][];
+            /** Resolved At */
+            resolved_at: string | null;
+            resolved_by: components["schemas"]["AssigneeRef"] | null;
+            status: components["schemas"]["IntakeStatus"];
+            /** Values Masked */
+            values_masked: boolean;
+            vehicle: components["schemas"]["IntakeVehicleRef"] | null;
+        };
+        /**
+         * IntakeResolve
+         * @description The person's answer: values for doubtful fields (null leaves a field
+         *     empty), and whether readings that differ from the vehicle replace the
+         *     current values.
+         */
+        IntakeResolve: {
+            /**
+             * Accept Changes
+             * @default false
+             */
+            accept_changes: boolean;
+            /** Values */
+            values?: {
+                [key: string]: string | null;
+            };
+        };
+        /**
+         * IntakeStatus
+         * @enum {string}
+         */
+        IntakeStatus: "applied" | "no_changes" | "needs_check" | "conflict" | "resolved";
+        /** IntakeVehicleRef */
+        IntakeVehicleRef: {
+            /** Customer Id */
+            customer_id: number;
+            /** Id */
+            id: number;
+            /** Registration Number */
+            registration_number: string;
+        };
+        /** JobCounts */
+        JobCounts: {
+            /** Cancelled This Month */
+            cancelled_this_month: number;
+            /** Completed This Month */
+            completed_this_month: number;
+            /** Completed Today */
+            completed_today: number;
+            /** Created This Month */
+            created_this_month: number;
+            /** Created Today */
+            created_today: number;
+            /** Due Today */
+            due_today: number;
+            open: components["schemas"]["OpenJobCounts"];
+            /** Overdue */
+            overdue: number;
+        };
+        /** JobCreate */
+        JobCreate: {
+            /** Customer Id */
+            customer_id: number;
+            /** Description */
+            description?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Service Id */
+            service_id: number;
+            /** Title */
+            title: string;
+            /** Vehicle Id */
+            vehicle_id?: number | null;
+        };
+        /** JobListResponse */
+        JobListResponse: {
+            /** Items */
+            items: components["schemas"]["JobRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** JobRead */
+        JobRead: {
+            /** Allowed Next Statuses */
+            allowed_next_statuses: components["schemas"]["JobStatus"][];
+            /** Assignees */
+            assignees: components["schemas"]["AssigneeRef"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number | null;
+            customer: components["schemas"]["CustomerRef"];
+            /** Description */
+            description: string | null;
+            document_progress?: components["schemas"]["DocumentProgress"] | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Id */
+            id: number;
+            /** Job Number */
+            job_number: string;
+            payment_summary?: components["schemas"]["PaymentSummary"] | null;
+            service: components["schemas"]["ServiceRef"] | null;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
+            vehicle?: components["schemas"]["JobVehicleRef"] | null;
+        };
+        /**
+         * JobSort
+         * @enum {string}
+         */
+        JobSort: "newest" | "urgency";
+        /**
+         * JobStatus
+         * @description Job statuses approved in docs/contracts/decisions.md section 7.
+         * @enum {string}
+         */
+        JobStatus: "pending" | "in_progress" | "waiting_for_documents" | "submitted" | "completed" | "cancelled";
+        /**
+         * JobUpdate
+         * @description Partial update: title, description, due_date and the vehicle
+         *     (null unlinks it).
+         */
+        JobUpdate: {
+            /** Description */
+            description?: string | null;
+            /** Due Date */
+            due_date?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Vehicle Id */
+            vehicle_id?: number | null;
+        };
+        /** JobVehicleRef */
+        JobVehicleRef: {
+            /** Id */
+            id: number;
+            /** Registration Number */
+            registration_number: string;
+        };
+        /**
+         * JobsExportRequest
+         * @description The jobs list's filters (no free-text search: the request is kept
+         *     with the export and audited).
+         */
+        JobsExportRequest: {
+            /** Assigned To */
+            assigned_to?: number | null;
+            /** Customer Id */
+            customer_id?: number | null;
+            due?: components["schemas"]["DueFilter"] | null;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "jobs";
+            payment?: components["schemas"]["PaymentFilter"] | null;
+            readiness?: components["schemas"]["Readiness"] | null;
+            /** Service Id */
+            service_id?: number | null;
+            status?: components["schemas"]["JobStatus"] | null;
+            /**
+             * Unassigned
+             * @default false
+             */
+            unassigned: boolean;
+        };
+        /**
+         * LinkDocumentRequest
+         * @description Reuse an already verified customer document for a checklist item.
+         */
+        LinkDocumentRequest: {
+            /** Document Id */
+            document_id: number;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** LoginResponse */
+        LoginResponse: {
+            /** Csrf Token */
+            csrf_token: string;
+            user: components["schemas"]["UserRead"];
+        };
+        /** MarkedResponse */
+        MarkedResponse: {
+            /** Marked */
+            marked: number;
+        };
+        /** NotificationListResponse */
+        NotificationListResponse: {
+            /** Items */
+            items: components["schemas"]["NotificationRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+            /** Unread */
+            unread: number;
+        };
+        /** NotificationRead */
+        NotificationRead: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Document Id */
+            document_id?: number | null;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id?: number | null;
+            /** Kind */
+            kind: string;
+            /**
+             * Occurrences
+             * @default 1
+             */
+            occurrences: number;
+            /** Read At */
+            read_at: string | null;
+            /** Reminder Id */
+            reminder_id: number | null;
+            /** Report Export Id */
+            report_export_id?: number | null;
+            /** Task Type */
+            task_type?: string | null;
+            /** Title */
+            title: string;
+            /** Vehicle Lookup Id */
+            vehicle_lookup_id?: number | null;
+        };
+        /** OcrField */
+        OcrField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Sensitive
+             * @default false
+             */
+            sensitive: boolean;
+        };
+        /** OcrFieldRead */
+        OcrFieldRead: {
+            /** Confidence */
+            confidence: number | null;
+            flag: components["schemas"]["FieldFlag"];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Masked */
+            masked: boolean;
+            /** Reviewed Value */
+            reviewed_value: string | null;
+            /** Sensitive */
+            sensitive: boolean;
+            /** Value */
+            value: string | null;
+        };
+        /** OcrRead */
+        OcrRead: {
+            /** Document Id */
+            document_id: number;
+            /** Document Status */
+            document_status: string;
+            /** Document Version */
+            document_version: number;
+            /** Failure Reason */
+            failure_reason: string | null;
+            /** Fields */
+            fields: components["schemas"]["OcrFieldRead"][];
+            ocr_status: components["schemas"]["OcrStatus"];
+            /** Provider */
+            provider: string | null;
+            /** Raw Text */
+            raw_text: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            reviewed_by: components["schemas"]["AssigneeRef"] | null;
+        };
+        /** OcrReviewRequest */
+        OcrReviewRequest: {
+            /**
+             * Apply To Customer
+             * @default []
+             */
+            apply_to_customer: components["schemas"]["ApplyToCustomer"][];
+            decision: components["schemas"]["ReviewDecision"];
+            /** Fields */
+            fields: {
+                [key: string]: string | null;
+            };
+            /** Reason */
+            reason?: string | null;
+        };
+        /** OcrReviewResponse */
+        OcrReviewResponse: {
+            /** Customer Fields Updated */
+            customer_fields_updated: components["schemas"]["CustomerField"][];
+            document: components["schemas"]["DocumentDetail"];
+            ocr: components["schemas"]["OcrRead"];
+        };
+        /**
+         * OcrStatus
+         * @enum {string}
+         */
+        OcrStatus: "not_applicable" | "not_started" | "pending" | "completed" | "failed";
+        /** OpenJobCounts */
+        OpenJobCounts: {
+            /** In Progress */
+            in_progress: number;
+            /** Pending */
+            pending: number;
+            /** Submitted */
+            submitted: number;
+            /** Waiting For Documents */
+            waiting_for_documents: number;
+        };
+        /** PasswordReset */
+        PasswordReset: {
+            /** Temporary Password */
+            temporary_password: string;
+        };
+        /** PaymentCreate */
+        PaymentCreate: {
+            /** Amount */
+            amount: number | string;
+            method: components["schemas"]["PaymentMethod"];
+            /** Notes */
+            notes?: string | null;
+            /** Reference Number */
+            reference_number?: string | null;
+        };
+        /**
+         * PaymentFilter
+         * @description Job list filter by money (received payments against active fees).
+         *     Cancelled jobs never match.
+         * @enum {string}
+         */
+        PaymentFilter: "due" | "paid" | "overpaid";
+        /** PaymentListResponse */
+        PaymentListResponse: {
+            /** Items */
+            items: components["schemas"]["PaymentRead"][];
+            summary: components["schemas"]["PaymentSummary"];
+        };
+        /**
+         * PaymentMethod
+         * @description Matches the ck_payments_method database constraint.
+         * @enum {string}
+         */
+        PaymentMethod: "cash" | "upi" | "card" | "bank_transfer" | "cheque" | "other";
+        /** PaymentRead */
+        PaymentRead: {
+            /** Amount */
+            amount: string;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** Notes */
+            notes: string | null;
+            receipt: components["schemas"]["ReceiptRead"] | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            recorded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Reference Number */
+            reference_number: string | null;
+            status: components["schemas"]["PaymentStatus"];
+            /** Void Reason */
+            void_reason: string | null;
+            /** Voided At */
+            voided_at: string | null;
+            voided_by: components["schemas"]["AssigneeRef"] | null;
+        };
+        /** PaymentRecorded */
+        PaymentRecorded: {
+            /** Amount */
+            amount: string;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** Notes */
+            notes: string | null;
+            receipt: components["schemas"]["ReceiptRead"] | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            recorded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Reference Number */
+            reference_number: string | null;
+            /** Replayed */
+            replayed: boolean;
+            status: components["schemas"]["PaymentStatus"];
+            summary: components["schemas"]["PaymentSummary"];
+            /** Void Reason */
+            void_reason: string | null;
+            /** Voided At */
+            voided_at: string | null;
+            voided_by: components["schemas"]["AssigneeRef"] | null;
+        };
+        /**
+         * PaymentState
+         * @description How much of the job's fees has been paid (received payments only).
+         * @enum {string}
+         */
+        PaymentState: "no_fees" | "unpaid" | "partial" | "paid" | "overpaid";
+        /**
+         * PaymentStatus
+         * @enum {string}
+         */
+        PaymentStatus: "received" | "voided";
+        /** PaymentSummary */
+        PaymentSummary: {
+            /** Balance */
+            balance: string;
+            /** Fees Total */
+            fees_total: string;
+            /** Paid */
+            paid: string;
+            state: components["schemas"]["PaymentState"];
+        };
+        /** PaymentWithSummary */
+        PaymentWithSummary: {
+            /** Amount */
+            amount: string;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id: number;
+            method: components["schemas"]["PaymentMethod"];
+            /** Notes */
+            notes: string | null;
+            receipt: components["schemas"]["ReceiptRead"] | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            recorded_by: components["schemas"]["AssigneeRef"] | null;
+            /** Reference Number */
+            reference_number: string | null;
+            status: components["schemas"]["PaymentStatus"];
+            summary: components["schemas"]["PaymentSummary"];
+            /** Void Reason */
+            void_reason: string | null;
+            /** Voided At */
+            voided_at: string | null;
+            voided_by: components["schemas"]["AssigneeRef"] | null;
+        };
+        /**
+         * Readiness
+         * @description Job list filter by document progress. Only jobs still gathering
+         *     documents (pending, in progress, waiting for documents) match.
+         * @enum {string}
+         */
+        Readiness: "missing_documents" | "needs_review" | "processing" | "ready_to_submit" | "ready_to_resume";
+        /** ReceiptDetail */
+        ReceiptDetail: {
+            /** Amount In Words */
+            amount_in_words: string;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Customer Id */
+            customer_id: number;
+            /** Id */
+            id: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            issued_by: components["schemas"]["AssigneeRef"] | null;
+            /** Job Id */
+            job_id: number;
+            /** Payment Id */
+            payment_id: number;
+            /** Print Count */
+            print_count: number;
+            /** Receipt Number */
+            receipt_number: string;
+            snapshot: components["schemas"]["ReceiptSnapshot"];
+            status: components["schemas"]["ReceiptStatus"];
+        };
+        /** ReceiptListItem */
+        ReceiptListItem: {
+            /** Amount */
+            amount: string;
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Id */
+            id: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Job Id */
+            job_id: number;
+            /** Job Number */
+            job_number: string;
+            method: components["schemas"]["PaymentMethod"];
+            /** Receipt Number */
+            receipt_number: string;
+            status: components["schemas"]["ReceiptStatus"];
+        };
+        /** ReceiptListResponse */
+        ReceiptListResponse: {
+            /** Items */
+            items: components["schemas"]["ReceiptListItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** ReceiptRead */
+        ReceiptRead: {
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Cancelled */
+            cancelled: boolean;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            issued_by: components["schemas"]["AssigneeRef"] | null;
+            /** Receipt Number */
+            receipt_number: string;
+        };
+        /**
+         * ReceiptSnapshot
+         * @description What the receipt shows, frozen when it was issued.
+         */
+        ReceiptSnapshot: {
+            /** Amount */
+            amount: string;
+            /** Balance After */
+            balance_after: string;
+            customer: components["schemas"]["SnapshotCustomer"];
+            /** Fees */
+            fees: components["schemas"]["SnapshotFee"][];
+            /** Fees Total */
+            fees_total: string;
+            job: components["schemas"]["SnapshotJob"];
+            /** Method */
+            method: string;
+            /** Paid Before */
+            paid_before: string;
+            /** Received By */
+            received_by: string;
+            /** Reference Number */
+            reference_number: string | null;
+        };
+        /**
+         * ReceiptStatus
+         * @enum {string}
+         */
+        ReceiptStatus: "issued" | "cancelled";
+        /** RecentJob */
+        RecentJob: {
+            /** Customer Name */
+            customer_name: string;
+            /** Id */
+            id: number;
+            /** Job Number */
+            job_number: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             */
+            last_activity_at: string;
+            status: components["schemas"]["JobStatus"];
+            /** Title */
+            title: string;
+        };
+        /** RejectRequest */
+        RejectRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** ReminderListResponse */
+        ReminderListResponse: {
+            /** Items */
+            items: components["schemas"]["ReminderRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** ReminderRead */
+        ReminderRead: {
+            /** Close Reason */
+            close_reason: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            closed_by: components["schemas"]["AssigneeRef"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Days Left */
+            days_left: number;
+            /** Expiry Type */
+            expiry_type: string;
+            /** Id */
+            id: number;
+            status: components["schemas"]["ReminderStatus"];
+            /**
+             * Valid Until
+             * Format: date
+             */
+            valid_until: string;
+            vehicle: components["schemas"]["ReminderVehicleRef"];
+            /** Whatsapp Link */
+            whatsapp_link: string | null;
+        };
+        /**
+         * ReminderStatus
+         * @enum {string}
+         */
+        ReminderStatus: "pending" | "ready_to_send" | "open" | "done" | "dismissed" | "superseded";
+        /** ReminderVehicleRef */
+        ReminderVehicleRef: {
+            assigned_to: components["schemas"]["AssigneeRef"] | null;
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Id */
+            id: number;
+            /** Registration Number */
+            registration_number: string;
+        };
+        /** RequirementCreate */
+        RequirementCreate: {
+            /**
+             * Allow Multiple
+             * @default false
+             */
+            allow_multiple: boolean;
+            /** Description */
+            description?: string | null;
+            /** Document Type Id */
+            document_type_id: number;
+            /**
+             * Is Required
+             * @default true
+             */
+            is_required: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /** RequirementRead */
+        RequirementRead: {
+            /** Allow Multiple */
+            allow_multiple: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string | null;
+            document_type: components["schemas"]["DocumentTypeRef"];
+            /** Id */
+            id: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Required */
+            is_required: boolean;
+            /** Sort Order */
+            sort_order: number;
+        };
+        /** RequirementUpdate */
+        RequirementUpdate: {
+            /** Allow Multiple */
+            allow_multiple?: boolean | null;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Is Required */
+            is_required?: boolean | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /**
+         * ReviewDecision
+         * @enum {string}
+         */
+        ReviewDecision: "verify" | "reject";
+        /** ReviewJobRef */
+        ReviewJobRef: {
+            /** Id */
+            id: number;
+            /** Job Number */
+            job_number: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ReviewKind
+         * @enum {string}
+         */
+        ReviewKind: "ocr_check" | "ocr_failed" | "manual";
+        /** ReviewQueueItem */
+        ReviewQueueItem: {
+            /** Current Version */
+            current_version: number;
+            customer: components["schemas"]["CustomerRef"];
+            /** Document Id */
+            document_id: number;
+            document_type: components["schemas"]["DocumentTypeRef"] | null;
+            /** Filename */
+            filename: string;
+            /** Flagged Fields */
+            flagged_fields: number | null;
+            /** Jobs */
+            jobs: components["schemas"]["ReviewJobRef"][];
+            review_kind: components["schemas"]["ReviewKind"];
+            status: components["schemas"]["DocumentStatus"];
+            /**
+             * Waiting Since
+             * Format: date-time
+             */
+            waiting_since: string;
+        };
+        /** ReviewQueueResponse */
+        ReviewQueueResponse: {
+            /** Items */
+            items: components["schemas"]["ReviewQueueItem"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /**
+         * Sensitivity
+         * @enum {string}
+         */
+        Sensitivity: "normal" | "sensitive";
+        /** ServiceCreate */
+        ServiceCreate: {
+            /** Category Id */
+            category_id: number;
+            /** Code */
+            code: string;
+            /** Default Service Fee */
+            default_service_fee?: number | string | null;
+            /** Description */
+            description?: string | null;
+            /** @default fixed */
+            fee_type: components["schemas"]["ServiceFeeType"];
+            /** Name */
+            name: string;
+            /**
+             * Requires Vehicle
+             * @default false
+             */
+            requires_vehicle: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /**
+         * ServiceFeeType
+         * @enum {string}
+         */
+        ServiceFeeType: "fixed" | "variable";
+        /** ServiceRead */
+        ServiceRead: {
+            category: components["schemas"]["CategoryRef"];
+            /** Code */
+            code: string;
+            /** Default Service Fee */
+            default_service_fee: string | null;
+            /** Description */
+            description: string | null;
+            fee_type: components["schemas"]["ServiceFeeType"];
+            /** Id */
+            id: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Requires Vehicle */
+            requires_vehicle: boolean;
+            /** Sort Order */
+            sort_order: number;
+        };
+        /** ServiceRef */
+        ServiceRef: {
+            /** Code */
+            code: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** ServiceUpdate */
+        ServiceUpdate: {
+            /** Category Id */
+            category_id?: number | null;
+            /** Default Service Fee */
+            default_service_fee?: number | string | null;
+            /** Description */
+            description?: string | null;
+            fee_type?: components["schemas"]["ServiceFeeType"] | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Requires Vehicle */
+            requires_vehicle?: boolean | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /** SnapshotCustomer */
+        SnapshotCustomer: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string | null;
+        };
+        /** SnapshotFee */
+        SnapshotFee: {
+            /** Amount */
+            amount: string;
+            /** Description */
+            description: string;
+            /** Fee Type */
+            fee_type: string;
+        };
+        /** SnapshotJob */
+        SnapshotJob: {
+            /** Id */
+            id: number;
+            /** Job Number */
+            job_number: string;
+            /** Service Name */
+            service_name: string | null;
+            /** Title */
+            title: string;
+        };
+        /** StatusChangeRequest */
+        StatusChangeRequest: {
+            /**
+             * Override Document Check
+             * @default false
+             */
+            override_document_check: boolean;
+            /** Reason */
+            reason?: string | null;
+            status: components["schemas"]["JobStatus"];
+        };
+        /** StatusHistoryRead */
+        StatusHistoryRead: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            changed_by: components["schemas"]["AssigneeRef"] | null;
+            /** Id */
+            id: number;
+            new_status: components["schemas"]["JobStatus"];
+            old_status: components["schemas"]["JobStatus"] | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /** TaskListResponse */
+        TaskListResponse: {
+            /** Items */
+            items: components["schemas"]["TaskRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** TaskRead */
+        TaskRead: {
+            /** Attempts */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Idempotency Key */
+            idempotency_key: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Run After
+             * Format: date-time
+             */
+            run_after: string;
+            status: components["schemas"]["TaskStatus"];
+            task_type: components["schemas"]["TaskType"];
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * TaskStatus
+         * @enum {string}
+         */
+        TaskStatus: "queued" | "running" | "succeeded" | "failed";
+        /**
+         * TaskType
+         * @enum {string}
+         */
+        TaskType: "document_ocr" | "vehicle_expiry_lookup" | "vehicle_mobile_lookup" | "report_export";
+        /** TaskTypeCounts */
+        TaskTypeCounts: {
+            /** Due */
+            due: number;
+            /** Failed Last Day */
+            failed_last_day: number;
+            /** Oldest Due Seconds */
+            oldest_due_seconds: number | null;
+            /** Queued */
+            queued: number;
+            /** Running */
+            running: number;
+            /** Succeeded Last Day */
+            succeeded_last_day: number;
+            task_type: components["schemas"]["TaskType"];
+        };
+        /**
+         * UserCreate
+         * @description Admin creates an account with a temporary password the user must change.
+         */
+        UserCreate: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Name */
+            name: string;
+            /** @default employee */
+            role: components["schemas"]["UserRole"];
+            /** Temporary Password */
+            temporary_password: string;
+        };
+        /** UserListResponse */
+        UserListResponse: {
+            /** Items */
+            items: components["schemas"]["UserRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** UserRead */
+        UserRead: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Id */
+            id: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Must Change Password */
+            must_change_password: boolean;
+            /** Name */
+            name: string;
+            role: components["schemas"]["UserRole"];
+        };
+        /**
+         * UserRole
+         * @enum {string}
+         */
+        UserRole: "admin" | "employee";
+        /** UserUpdate */
+        UserUpdate: {
+            /** Email */
+            email?: string | null;
+            /** Name */
+            name?: string | null;
+            role?: components["schemas"]["UserRole"] | null;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
+        /**
+         * ValueSource
+         * @enum {string}
+         */
+        ValueSource: "manual" | "document" | "lookup";
+        /**
+         * VehicleCategory
+         * @enum {string}
+         */
+        VehicleCategory: "two_wheeler" | "private_four_wheeler" | "commercial" | "other";
+        /** VehicleCreate */
+        VehicleCreate: {
+            /** Assigned To */
+            assigned_to?: number | null;
+            category: components["schemas"]["VehicleCategory"];
+            /** Chassis Number */
+            chassis_number?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
+            /** Customer Id */
+            customer_id: number;
+            /** Engine Number */
+            engine_number?: string | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Registration Number */
+            registration_number: string;
+        };
+        /** VehicleCustomerRef */
+        VehicleCustomerRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** VehicleListResponse */
+        VehicleListResponse: {
+            /** Items */
+            items: components["schemas"]["VehicleRead"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** VehicleLookupList */
+        VehicleLookupList: {
+            /** Items */
+            items: components["schemas"]["VehicleLookupRead"][];
+        };
+        /** VehicleLookupRead */
+        VehicleLookupRead: {
+            /** Captcha Expires At */
+            captcha_expires_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Failure Reason */
+            failure_reason: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Provider */
+            provider: string | null;
+            requested_by: components["schemas"]["AssigneeRef"] | null;
+            result: components["schemas"]["VehicleLookupResult"] | null;
+            status: components["schemas"]["VehicleLookupStatus"];
+            /** Vehicle Id */
+            vehicle_id: number;
+        };
+        /** VehicleLookupResult */
+        VehicleLookupResult: {
+            /** Applied */
+            applied: string[];
+            /** Challan Count */
+            challan_count: number | null;
+            /** Challan Status */
+            challan_status: string | null;
+            /** Expiries */
+            expiries: {
+                [key: string]: string;
+            };
+            /** Not Applied */
+            not_applied: string[];
+        };
+        /**
+         * VehicleLookupStatus
+         * @enum {string}
+         */
+        VehicleLookupStatus: "queued" | "waiting_for_captcha" | "completed" | "failed" | "expired";
+        /** VehicleRead */
+        VehicleRead: {
+            assigned_to: components["schemas"]["AssigneeRef"] | null;
+            category: components["schemas"]["VehicleCategory"];
+            /** Challan Checked At */
+            challan_checked_at: string | null;
+            challan_status: components["schemas"]["ChallanStatus"];
+            /** Chassis Number */
+            chassis_number: string | null;
+            /** Contact Phone */
+            contact_phone: string | null;
+            contact_phone_source: components["schemas"]["ValueSource"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            customer: components["schemas"]["VehicleCustomerRef"];
+            /** Engine Number */
+            engine_number: string | null;
+            /** Expiries */
+            expiries: components["schemas"]["ExpiryRead"][];
+            /** Id */
+            id: number;
+            /** Identifiers Masked */
+            identifiers_masked: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Registration Number */
+            registration_number: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * VehicleRole
+         * @enum {string}
+         */
+        VehicleRole: "registration_certificate";
+        /**
+         * VehicleUpdate
+         * @description Partial update. Owner name, chassis, engine and contact phone can be
+         *     cleared with null. Admins only: customer_id (ownership transfer),
+         *     assigned_to and is_active.
+         */
+        VehicleUpdate: {
+            /** Assigned To */
+            assigned_to?: number | null;
+            category?: components["schemas"]["VehicleCategory"] | null;
+            /** Chassis Number */
+            chassis_number?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
+            /** Customer Id */
+            customer_id?: number | null;
+            /** Engine Number */
+            engine_number?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Registration Number */
+            registration_number?: string | null;
+        };
+        /**
+         * VehiclesExportRequest
+         * @description The same filters as GET /reports/vehicles.xlsx.
+         */
+        VehiclesExportRequest: {
+            /** Customer Id */
+            customer_id?: number | null;
+            /** Due Within Days */
+            due_within_days?: number | null;
+            /**
+             * Include Inactive
+             * @default false
+             */
+            include_inactive: boolean;
+            /**
+             * Include Whatsapp
+             * @default true
+             */
+            include_whatsapp: boolean;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "vehicles";
+        };
+        /** VoidRequest */
+        VoidRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * WorkQueueSummary
+         * @description What the signed-in user has to do next. Employees count only open
+         *     jobs they are assigned to; admins count every open job.
+         */
+        WorkQueueSummary: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Documents To Review */
+            documents_to_review: number;
+            /** Jobs Due Today */
+            jobs_due_today: number;
+            /** Jobs Missing Documents */
+            jobs_missing_documents: number;
+            /** Jobs Overdue */
+            jobs_overdue: number;
+            /** Jobs Overpaid */
+            jobs_overpaid: number | null;
+            /** Jobs Processing */
+            jobs_processing: number;
+            /** Jobs Ready To Resume */
+            jobs_ready_to_resume: number;
+            /** Jobs Ready To Submit */
+            jobs_ready_to_submit: number;
+            /** Jobs With Balance Due */
+            jobs_with_balance_due: number;
+            /** Lookups Waiting For Captcha */
+            lookups_waiting_for_captcha: number;
+            /** Reminders To Send */
+            reminders_to_send: number;
+            /** Unassigned Jobs */
+            unassigned_jobs: number | null;
+            /** Unread Notifications */
+            unread_notifications: number;
+            /** Vehicle Readings To Check */
+            vehicle_readings_to_check: number;
+        };
+        /**
+         * WorkerState
+         * @enum {string}
+         */
+        WorkerState: "running" | "stuck" | "not_reporting" | "stopped";
+        /** WorkerStatus */
+        WorkerStatus: {
+            /** Last Active At */
+            last_active_at: string | null;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            state: components["schemas"]["WorkerState"];
+            /** Stopped At */
+            stopped_at: string | null;
+            /** Tasks Done */
+            tasks_done: number;
+            /** Worker Name */
+            worker_name: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -50,6 +3717,1849 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_logs_api_v1_audit_logs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                action?: string | null;
+                entity_type?: string | null;
+                entity_id?: number | null;
+                user_id?: number | null;
+                /** @description On or after (centre's calendar) */
+                date_from?: string | null;
+                /** @description On or before (centre's calendar) */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogPage"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_change_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Wrong or reused password */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Invalid credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_customers_api_v1_customers_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Name, 4+ digits of the phone number, or a vehicle registration number */
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_customer_api_v1_customers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCreated"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_api_v1_customers__customer_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_api_v1_customers__customer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_api_v1_customers__customer_id__documents_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+                status?: components["schemas"]["DocumentStatus"] | null;
+            };
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_document_api_v1_customers__customer_id__documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_document_api_v1_customers__customer_id__documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    dashboard_api_v1_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_document_types_api_v1_document_types_get: {
+        parameters: {
+            query?: {
+                /** @description true: only active; false: only inactive */
+                active?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTypeRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_document_type_api_v1_document_types_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTypeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_document_type_api_v1_document_types__type_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                type_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTypeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_api_v1_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_api_v1_documents__document_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_api_v1_documents__document_id__download_get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/octet-stream": unknown;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ocr_api_v1_documents__document_id__ocr_get: {
+        parameters: {
+            query?: {
+                /** @description Show sensitive values and raw text (audited) */
+                reveal?: boolean;
+            };
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OcrRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Reveal needs review rights */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_ocr_api_v1_documents__document_id__ocr_retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OcrRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_ocr_api_v1_documents__document_id__ocr_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OcrReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OcrReviewResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_api_v1_documents__document_id__preview_get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/octet-stream": unknown;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_v1_documents__document_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_intake_api_v1_documents__document_id__vehicle_intake_get: {
+        parameters: {
+            query?: {
+                /** @description Show full chassis and engine numbers (admin or the responsible employee; audited) */
+                reveal?: boolean;
+            };
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed for this user */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document or reading not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_intake_api_v1_documents__document_id__vehicle_intake_resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntakeResolve"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntakeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed for this user */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document or reading not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Registration owned elsewhere */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_api_v1_documents__document_id__verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_version_api_v1_documents__document_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_version_api_v1_documents__document_id__versions_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_exports_api_v1_exports_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_export_api_v1_exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehiclesExportRequest"] | components["schemas"]["JobsExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Three of your exports are still being made */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_api_v1_exports__export_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_export_api_v1_exports__export_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The spreadsheet */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Export not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not ready, or it failed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Expired: ask for a new one */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     api_health_api_v1_health_get: {
         parameters: {
             query?: never;
@@ -66,6 +5576,3928 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    api_ready_api_v1_health_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReadiness"];
+                };
+            };
+            /** @description The database is down */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthReadiness"];
+                };
+            };
+        };
+    };
+    list_jobs_api_v1_jobs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Matches job number or title */
+                search?: string | null;
+                customer_id?: number | null;
+                service_id?: number | null;
+                status?: components["schemas"]["JobStatus"] | null;
+                due_date?: string | null;
+                /** @description A user id, or 'me' for the signed-in user */
+                assigned_to?: string | null;
+                /** @description Document progress (jobs still gathering documents) */
+                readiness?: components["schemas"]["Readiness"] | null;
+                /** @description Open jobs overdue or due today (centre's calendar) */
+                due?: components["schemas"]["DueFilter"] | null;
+                /** @description Open jobs nobody is assigned to (admins) */
+                unassigned?: boolean;
+                sort?: components["schemas"]["JobSort"];
+                /** @description Money: due, fully paid or overpaid (not cancelled) */
+                payment?: components["schemas"]["PaymentFilter"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_job_api_v1_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Customer or service not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job could not be created */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or the selected service is inactive */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_job_api_v1_jobs__job_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_assignments_api_v1_jobs__job_id__assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_user_api_v1_jobs__job_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job or user not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User already assigned */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unassign_user_api_v1_jobs__job_id__assignments__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job or assignment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_job_api_v1_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_checklist_api_v1_jobs__job_id__checklist_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_document_api_v1_jobs__job_id__checklist__item_id__documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_fees_api_v1_jobs__job_id__fees_get: {
+        parameters: {
+            query?: {
+                /** @description Also list removed fees (totals never include them) */
+                include_removed?: boolean;
+            };
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_fee_api_v1_jobs__job_id__fees_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    remove_fee_api_v1_jobs__job_id__fees__fee_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+                fee_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job or fee not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_fee_api_v1_jobs__job_id__fees__fee_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+                fee_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeeRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job or fee not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payments_api_v1_jobs__job_id__payments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_payment_api_v1_jobs__job_id__payments_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A new random value (e.g. a UUID) per payment. Send the same value when retrying the same payment: it is recorded only once. */
+                "Idempotency-Key": string;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Repeat of an earlier request: the original payment, as it is now (check status: it may have been voided since) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRecorded"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRecorded"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Idempotency-Key already used for a different payment */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_status_api_v1_jobs__job_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_status_history_api_v1_jobs__job_id__status_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusHistoryRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_read_api_v1_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkedResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_read_api_v1_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkedResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Notification not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    void_payment_api_v1_payments__payment_id__void_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentWithSummary"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Payment not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Already voided */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_receipts_api_v1_receipts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Receipt number, job number or customer name */
+                search?: string | null;
+                customer_id?: number | null;
+                job_id?: number | null;
+                method?: components["schemas"]["PaymentMethod"] | null;
+                status?: components["schemas"]["ReceiptStatus"] | null;
+                /** @description Issued on or after (centre's calendar) */
+                date_from?: string | null;
+                /** @description Issued on or before (centre's calendar) */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_receipt_api_v1_receipts__receipt_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptDetail"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Receipt not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    print_receipt_api_v1_receipts__receipt_id__print_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receipt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The receipt PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Receipt not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reminders_api_v1_reminders_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: components["schemas"]["ReminderStatus"] | null;
+                vehicle_id?: number | null;
+                expiry_type?: components["schemas"]["ExpiryType"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_api_v1_reminders__reminder_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Reminder not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_done_api_v1_reminders__reminder_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Reminder not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collections_api_v1_reports_collections_get: {
+        parameters: {
+            query?: {
+                /** @description First day, inclusive (default: date_to) */
+                date_from?: string | null;
+                /** @description Last day, inclusive (default: today, centre's calendar) */
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionsReport"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vehicles_export_api_v1_reports_vehicles_xlsx_get: {
+        parameters: {
+            query?: {
+                /** @description Only vehicles with a date expiring within this many days (expired ones included) */
+                due_within_days?: number | null;
+                include_inactive?: boolean;
+                customer_id?: number | null;
+                /** @description Add the WhatsApp column (its links carry the full mobile number) */
+                include_whatsapp?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The vehicles spreadsheet */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid filters, or too many rows (filter further) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    review_queue_api_v1_review_queue_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                customer_id?: number | null;
+                job_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_api_v1_service_categories_get: {
+        parameters: {
+            query?: {
+                /** @description true: only active; false: only inactive */
+                active?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_category_api_v1_service_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_api_v1_service_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_services_api_v1_services_get: {
+        parameters: {
+            query?: {
+                /** @description true: only active; false: only inactive */
+                active?: boolean | null;
+                category_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_service_api_v1_services_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_service_api_v1_services__service_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_service_api_v1_services__service_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_requirements_api_v1_services__service_id__document_requirements_get: {
+        parameters: {
+            query?: {
+                /** @description true: only active; false: only inactive */
+                active?: boolean | null;
+            };
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"][];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_requirement_api_v1_services__service_id__document_requirements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Code or name already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_requirement_api_v1_services__service_id__document_requirements__requirement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: number;
+                requirement_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequirementUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequirementRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_tasks_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                status?: components["schemas"]["TaskStatus"] | null;
+                task_type?: components["schemas"]["TaskType"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    background_overview_api_v1_tasks_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackgroundStatus"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Task not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_task_api_v1_tasks__task_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Task not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation error, or a business rule (e.g. the job is closed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_users_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                search?: string | null;
+                role?: components["schemas"]["UserRole"] | null;
+                is_active?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_user_api_v1_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Email already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_api_v1_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Email already used */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation or business rule */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deactivate_user_api_v1_users__user_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation or business rule */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reactivate_user_api_v1_users__user_id__reactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_v1_users__user_id__reset_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordReset"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_expiries_api_v1_vehicle_expiries_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                bucket?: components["schemas"]["ExpiryBucket"] | null;
+                expiry_type?: components["schemas"]["ExpiryType"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lookup_api_v1_vehicle_lookups__lookup_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lookup_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLookupRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    captcha_image_api_v1_vehicle_lookups__lookup_id__captcha_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lookup_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CAPTCHA to read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_captcha_api_v1_vehicle_lookups__lookup_id__captcha_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lookup_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptchaAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLookupRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vehicles_api_v1_vehicles_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Registration number (any spacing), owner or customer name */
+                search?: string | null;
+                customer_id?: number | null;
+                assigned_to?: number | null;
+                category?: components["schemas"]["VehicleCategory"] | null;
+                /** @description Default: active only; omit with null */
+                is_active?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleListResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vehicle_api_v1_vehicles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed for this user */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Customer not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Registration number in use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_vehicle_api_v1_vehicles__vehicle_id__get: {
+        parameters: {
+            query?: {
+                /** @description Show full chassis and engine numbers (admin or the responsible employee; audited) */
+                reveal?: boolean;
+            };
+            header?: never;
+            path: {
+                vehicle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed to reveal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Vehicle not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vehicle_api_v1_vehicles__vehicle_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed for this user */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Vehicle not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Registration number in use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_expiry_api_v1_vehicles__vehicle_id__expiries__expiry_type__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: number;
+                expiry_type: components["schemas"]["ExpiryType"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpirySet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Vehicle not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    expiry_history_api_v1_vehicles__vehicle_id__expiries__expiry_type__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: number;
+                expiry_type: components["schemas"]["ExpiryType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryHistoryResponse"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Vehicle not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_lookups_api_v1_vehicles__vehicle_id__lookups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLookupList"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_lookup_api_v1_vehicles__vehicle_id__lookups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vehicle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleLookupRead"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description A lookup is already running */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    work_queue_api_v1_work_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkQueueSummary"];
+                };
+            };
+            /** @description Not signed in or session expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed, or CSRF missing */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
