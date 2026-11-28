@@ -49,3 +49,23 @@ const STATUS_LABELS: Record<string, string> = {
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status
 }
+
+const rupees = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** "1234.5" -> "₹1,234.50" (Indian digit grouping). */
+export function formatMoney(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isNaN(n) ? '-' : rupees.format(n)
+}
+
+const PAYMENT_STATE_LABELS: Record<string, string> = {
+  no_fees: 'No fees',
+  unpaid: 'Unpaid',
+  partial: 'Part paid',
+  paid: 'Paid',
+  overpaid: 'Overpaid',
+}
+export function paymentStateLabel(state: string): string {
+  return PAYMENT_STATE_LABELS[state] ?? state
+}

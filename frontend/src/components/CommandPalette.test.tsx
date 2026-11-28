@@ -14,6 +14,7 @@ function setup() {
     'GET /api/v1/auth/me': employeeUser,
     'GET /api/v1/dashboard': emptyDashboard,
     'GET /api/v1/work-queue': emptyQueue,
+    'GET /api/v1/customers/7': { id: 7, name: 'Ravi Kumar', phone: '9876543210', email: null, address: null, notes: null, created_at: '2026-11-01T00:00:00Z' },
     'GET /api/v1/customers': page([{ id: 7, name: 'Ravi Kumar', phone_masked: 'XXXXXX1234', created_at: '2026-11-01T00:00:00Z' }]),
     'GET /api/v1/jobs': page([
       { id: 9, job_number: 'J-0009', title: 'RC renewal', status: 'pending', customer: { id: 7, name: 'Ravi Kumar', phone: null } },
@@ -171,7 +172,7 @@ describe('command palette', () => {
       await userEvent.type(await screen.findByRole('combobox'), 'ravi')
       await screen.findAllByRole('option')
       await userEvent.keyboard('{Enter}')
-      await screen.findByRole('heading', { name: 'Customer' })
+      await screen.findByRole('heading', { name: 'Ravi Kumar' })
       expect(document.activeElement).not.toBe(trigger)
     })
   })

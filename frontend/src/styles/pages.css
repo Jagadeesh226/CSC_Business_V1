@@ -1,0 +1,77 @@
+/* Customers, jobs and the New Job flow. Colours and sizes come from tokens.css. */
+
+.field select,
+.field textarea,
+.inline select,
+td input,
+td select {
+  min-height: var(--target-size);
+  padding: 0 var(--space-3);
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-md);
+  max-width: 100%;
+}
+.field textarea { padding: var(--space-2) var(--space-3); resize: vertical; }
+.field select[aria-invalid='true'],
+.field textarea[aria-invalid='true'],
+td input[aria-invalid='true'] { border-color: var(--color-danger); }
+.field input[type='file'] { padding: var(--space-2) var(--space-3); }
+.field .check { display: flex; align-items: center; gap: var(--space-2); font-weight: 400; min-height: var(--target-size); }
+.field .check input { min-height: auto; width: 1.25rem; height: 1.25rem; }
+.field textarea,
+.field input:not([type='checkbox']),
+.field select { width: 100%; max-width: 40rem; }
+
+.btn-danger { color: var(--color-danger); border-color: var(--color-danger); }
+.btn-danger:hover { background: var(--color-danger-bg); }
+
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.page-head h1 { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.inline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.row-between { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; }
+.plain-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0 var(--space-4); align-items: end; }
+.filters .field { margin-bottom: var(--space-3); }
+
+.pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; }
+
+.job-head { margin-bottom: var(--space-4); }
+.job-head h1 { overflow-wrap: anywhere; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-4); }
+.facts dt { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--color-border); }
+.tabs [role='tab'] {
+  min-height: var(--target-size);
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+.tabs [role='tab'][aria-selected='true'] { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.tabs [role='tab']:hover { background: var(--color-surface-muted); }
+.tabpanel { padding: var(--space-4) 0; }
+
+.checklist-item { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.checklist-item:last-child { border-bottom: 0; }
+.checklist-actions { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+.checklist-actions .field { margin-bottom: 0; }
+
+.dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: var(--space-4); background: var(--color-overlay); }
+.dialog { width: 100%; max-width: 28rem; box-shadow: var(--shadow-md); }
+
+@media (max-width: 480px) {
+  .actions .btn { flex: 1 1 100%; }
+  .row-between .btn { flex: 1 1 100%; }
+}

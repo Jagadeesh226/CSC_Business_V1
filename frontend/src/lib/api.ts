@@ -66,6 +66,9 @@ type BodyOf<O> = O extends { requestBody: { content: { 'application/json': infer
 
 export type GetPath = { [P in keyof paths]: paths[P] extends { get: unknown } ? P : never }[keyof paths]
 export type PostPath = { [P in keyof paths]: paths[P] extends { post: unknown } ? P : never }[keyof paths]
+export type PatchPath = { [P in keyof paths]: paths[P] extends { patch: unknown } ? P : never }[keyof paths]
+export type DeletePath = { [P in keyof paths]: paths[P] extends { delete: unknown } ? P : never }[keyof paths]
+export type PatchBody<P extends PatchPath> = BodyOf<OpOf<P, 'patch'>>
 export type GetResponse<P extends GetPath> = OkOf<OpOf<P, 'get'>>
 export type GetQuery<P extends GetPath> = QueryOf<OpOf<P, 'get'>>
 export type PostBody<P extends PostPath> = BodyOf<OpOf<P, 'post'>>
@@ -79,6 +82,8 @@ type OptsArg<O, Extra> = [PathParamsOf<O>] extends [never]
 interface RequestOptions {
   query?: Record<string, unknown>
   body?: unknown
+  /** Multipart body (file uploads). The browser sets the content type and boundary. */
+  form?: FormData
   /** Values for {placeholders} in the path. */
   params?: Record<string, string | number>
   /**
@@ -180,7 +185,7 @@ async function toError(res: Response, opts: RequestOptions): Promise<ApiError> {
 
 async function request(method: string, path: string, opts: RequestOptions = {}): Promise<unknown> {
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (opts.body !== undefined && !opts.form) headers['Content-Type'] = 'application/json'
   if (method !== 'GET') {
     const csrf = readCsrfToken()
     if (csrf) headers['X-CSRF-Token'] = csrf
@@ -193,7 +198,7 @@ async function request(method: string, path: string, opts: RequestOptions = {}):
       method,
       headers,
       credentials: 'include',
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
       signal: opts.signal,
     })
   } catch (err) {
@@ -229,5 +234,24 @@ export const api = {
     ...args: OptsArg<OpOf<P, 'post'>, Omit<RequestOptions, 'body' | 'params'> & { body?: PostBody<P> }>
   ): Promise<PostResponse<P>> {
     return request('POST', path, (args[0] ?? {}) as RequestOptions) as Promise<PostResponse<P>>
+  },
+  /** multipart/form-data upload (the file field is added by the caller). */
+  postForm<P extends PostPath>(
+    path: P,
+    ...args: OptsArg<OpOf<P, 'post'>, Omit<RequestOptions, 'body' | 'params' | 'form'> & { form: FormData }>
+  ): Promise<PostResponse<P>> {
+    return request('POST', path, args[0] as RequestOptions) as Promise<PostResponse<P>>
+  },
+  patch<P extends PatchPath>(
+    path: P,
+    ...args: OptsArg<OpOf<P, 'patch'>, Omit<RequestOptions, 'body' | 'params'> & { body?: PatchBody<P> }>
+  ): Promise<OkOf<OpOf<P, 'patch'>>> {
+    return request('PATCH', path, (args[0] ?? {}) as RequestOptions) as Promise<OkOf<OpOf<P, 'patch'>>>
+  },
+  delete<P extends DeletePath>(
+    path: P,
+    ...args: OptsArg<OpOf<P, 'delete'>, Omit<RequestOptions, 'body' | 'params'>>
+  ): Promise<OkOf<OpOf<P, 'delete'>>> {
+    return request('DELETE', path, (args[0] ?? {}) as RequestOptions) as Promise<OkOf<OpOf<P, 'delete'>>>
   },
 }

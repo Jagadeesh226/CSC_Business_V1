@@ -5,14 +5,14 @@ import { ApiEvents, RequireAdmin, RequireAuth } from './auth/Guards'
 import { LoginPage } from './pages/LoginPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { CustomersPage } from './pages/CustomersPage'
+import { CustomerDetailPage } from './pages/CustomerDetailPage'
+import { JobsPage } from './pages/JobsPage'
+import { JobDetailPage } from './pages/JobDetailPage'
+import { NewJobPage } from './pages/NewJobPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 const PLACEHOLDERS: { path: string; title: string }[] = [
-  { path: 'customers', title: 'Customers' },
-  { path: 'customers/:id', title: 'Customer' },
-  { path: 'jobs/new', title: 'New Job' },
-  { path: 'jobs', title: 'Jobs' },
-  { path: 'jobs/:id', title: 'Job' },
   { path: 'documents', title: 'Documents' },
   { path: 'vehicles', title: 'Vehicles & Expiries' },
   { path: 'vehicles/:id', title: 'Vehicle' },
@@ -38,6 +38,11 @@ export function AppRoutes() {
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="customers/:id" element={<CustomerDetailPage />} />
+            <Route path="jobs" element={<JobsPage />} />
+            <Route path="jobs/new" element={<NewJobPage />} />
+            <Route path="jobs/:id" element={<JobDetailPage />} />
             {PLACEHOLDERS.map((p) => (
               <Route key={p.path} path={p.path} element={<Placeholder title={p.title} />} />
             ))}

@@ -1,0 +1,17 @@
+import type { components } from '../api/schema'
+
+type S = components['schemas']
+export type Job = S['JobRead']
+export type JobStatus = S['JobStatus']
+export type Customer = S['CustomerRead']
+export type CustomerSummary = S['CustomerSummary']
+export type Service = S['ServiceRead']
+export type Category = S['CategoryRead']
+export type Requirement = S['RequirementRead']
+export type ChecklistResponse = S['ChecklistResponse']
+export type ChecklistItem = S['ChecklistItemRead']
+export type DocumentRead = S['DocumentRead']
+export type FeeRead = S['FeeRead']
+export type FeeType = S['FeeType']
+export type UserRead = S['UserRead']
+export type Assignee = S['AssigneeRef']
